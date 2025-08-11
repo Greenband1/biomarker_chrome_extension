@@ -1,0 +1,41 @@
+{
+  "manifest_version": 3,
+  "name": "Function Health Data Extractor",
+  "version": "2.0.1",
+  "description": "Extract and export your biomarker data from Function Health into CSV, JSON, and table formats. Not affiliated with Function Health.",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://*.functionhealth.com/*",
+    "https://functionhealth.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://*.functionhealth.com/*", "https://functionhealth.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["final-api-extractor.js"],
+      "matches": ["https://*.functionhealth.com/*"]
+    }
+  ]
+}
