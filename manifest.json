@@ -5,7 +5,6 @@
   "description": "Extract and export your biomarker data from Function Health into CSV, JSON, and table formats. Not affiliated with Function Health.",
   "permissions": [
     "activeTab",
-    "storage",
     "scripting"
   ],
   "host_permissions": [

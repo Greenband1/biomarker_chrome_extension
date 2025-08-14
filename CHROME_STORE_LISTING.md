@@ -70,6 +70,8 @@ Table Format - Tab-separated for easy pasting into documents
 • No data sent to external servers or third parties
 • Uses your existing Function Health login session
 • Extension doesn't store your data permanently
+• No remote code execution - all code is bundled with extension
+• Minimal permissions: only activeTab, scripting, and Function Health domain access
 • Open source code for full transparency
 
 ⚖️ LEGAL NOTICE
