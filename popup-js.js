@@ -848,30 +848,42 @@ function applyFilters() {
                 outOfRange: 0
             };
             
-            // Filter biomarkers
-            originalCategory.biomarkers.forEach(biomarker => {
-                const filteredBiomarker = { ...biomarker };
-                
-                if (latestOnlyActive) {
-                    // Latest-only mode: find most recent date per biomarker
-                    filteredBiomarker.historicalValues = getLatestResultForBiomarker(biomarker);
-                } else {
-                    // Regular date filtering
+            if (latestOnlyActive) {
+                // Deduplicate by biomarker name and keep only the most recent entry across duplicates
+                const nameToLatest = new Map();
+                originalCategory.biomarkers.forEach(biomarker => {
+                    const latestEntry = getLatestSnapshotFromBiomarker(biomarker);
+                    if (!latestEntry) return;
+                    const existing = nameToLatest.get(biomarker.name);
+                    if (!existing || new Date(latestEntry.date || '1900-01-01') > new Date(existing.date || '1900-01-01')) {
+                        const normalized = {
+                            ...biomarker,
+                            historicalValues: [latestEntry],
+                            status: latestEntry.status || biomarker.status,
+                            value: latestEntry.value ?? biomarker.value,
+                            unit: latestEntry.unit ?? biomarker.unit,
+                            date: latestEntry.date || biomarker.date
+                        };
+                        nameToLatest.set(biomarker.name, normalized);
+                    }
+                });
+                filteredCategory.biomarkers = Array.from(nameToLatest.values());
+            } else {
+                // Regular date filtering without deduplication
+                originalCategory.biomarkers.forEach(biomarker => {
+                    const filteredBiomarker = { ...biomarker };
                     if (biomarker.historicalValues && Array.isArray(biomarker.historicalValues)) {
                         filteredBiomarker.historicalValues = biomarker.historicalValues.filter(hv => 
                             selectedDates.includes(hv.date)
                         );
                     }
-                }
-                
-                // Include biomarker if it has data
-                const hasCurrentData = latestOnlyActive || !biomarker.date || selectedDates.includes(biomarker.date);
-                const hasHistoricalData = filteredBiomarker.historicalValues && filteredBiomarker.historicalValues.length > 0;
-                
-                if (hasCurrentData || hasHistoricalData) {
-                    filteredCategory.biomarkers.push(filteredBiomarker);
-                }
-            });
+                    const hasCurrentData = !biomarker.date || selectedDates.includes(biomarker.date);
+                    const hasHistoricalData = filteredBiomarker.historicalValues && filteredBiomarker.historicalValues.length > 0;
+                    if (hasCurrentData || hasHistoricalData) {
+                        filteredCategory.biomarkers.push(filteredBiomarker);
+                    }
+                });
+            }
             
             filteredCategory.count = filteredCategory.biomarkers.length;
             filteredData.categories[categoryName] = filteredCategory;
@@ -1094,29 +1106,66 @@ function normalizeToLatestOnlyDataset(source) {
         const cloned = JSON.parse(JSON.stringify(source));
         if (!cloned || !cloned.categories) return source;
         
-        Object.values(cloned.categories).forEach(category => {
+        Object.keys(cloned.categories).forEach(categoryName => {
+            const category = cloned.categories[categoryName];
             if (!category || !Array.isArray(category.biomarkers)) return;
+            const nameToLatest = new Map();
             category.biomarkers.forEach(biomarker => {
                 if (!biomarker) return;
-                if (Array.isArray(biomarker.historicalValues) && biomarker.historicalValues.length > 0) {
-                    // Pick most recent by date
-                    const latest = [...biomarker.historicalValues]
-                        .filter(v => v && v.date)
-                        .sort((a, b) => new Date(b.date) - new Date(a.date))[0] || biomarker.historicalValues[0];
-                    biomarker.historicalValues = [latest];
-                    // Also mirror top-level convenience fields for exporters that may rely on them
-                    biomarker.status = latest.status || biomarker.status;
-                    biomarker.value = latest.value || biomarker.value;
-                    biomarker.unit = latest.unit || biomarker.unit;
-                    biomarker.date = latest.date || biomarker.date;
+                const latestEntry = getLatestSnapshotFromBiomarker(biomarker);
+                if (!latestEntry) return;
+                const existing = nameToLatest.get(biomarker.name);
+                const latestDate = new Date(latestEntry.date || '1900-01-01');
+                if (!existing || latestDate > new Date(existing.date || '1900-01-01')) {
+                    nameToLatest.set(biomarker.name, {
+                        ...biomarker,
+                        historicalValues: [latestEntry],
+                        status: latestEntry.status || biomarker.status,
+                        value: latestEntry.value ?? biomarker.value,
+                        unit: latestEntry.unit ?? biomarker.unit,
+                        date: latestEntry.date || biomarker.date
+                    });
                 }
             });
+            category.biomarkers = Array.from(nameToLatest.values());
+            category.count = category.biomarkers.length;
         });
         return cloned;
     } catch (e) {
         console.warn('normalizeToLatestOnlyDataset failed; falling back to source', e);
         return source;
     }
+}
+
+/**
+ * @description Determine the most recent snapshot for a biomarker across its top-level date and historicalValues
+ * @returns {{date:string, value:any, unit:any, status:string}|null}
+ */
+function getLatestSnapshotFromBiomarker(biomarker) {
+    const candidates = [];
+    if (Array.isArray(biomarker.historicalValues)) {
+        biomarker.historicalValues.forEach(hv => {
+            if (!hv) return;
+            const date = hv.date || biomarker.date || null;
+            candidates.push({
+                date,
+                value: hv.value !== undefined ? hv.value : biomarker.value,
+                unit: hv.unit !== undefined ? hv.unit : biomarker.unit,
+                status: hv.status || biomarker.status
+            });
+        });
+    }
+    if (!biomarker.historicalValues || biomarker.historicalValues.length === 0) {
+        candidates.push({
+            date: biomarker.date || null,
+            value: biomarker.value,
+            unit: biomarker.unit,
+            status: biomarker.status
+        });
+    }
+    if (candidates.length === 0) return null;
+    candidates.sort((a, b) => new Date(b.date || '1900-01-01') - new Date(a.date || '1900-01-01'));
+    return candidates[0];
 }
 
 /**
