@@ -249,14 +249,30 @@ function convertToCSV(data) {
     const allBiomarkers = [];
     Object.entries(data.categories).forEach(([categoryName, category]) => {
         category.biomarkers.forEach(biomarker => {
-            allBiomarkers.push({
-                category: categoryName,
-                name: biomarker.name,
-                status: biomarker.status,
-                value: biomarker.value || '',
-                unit: biomarker.unit || '',
-                date: biomarker.date || ''
-            });
+            // Check if biomarker has historical values
+            if (biomarker.historicalValues && Array.isArray(biomarker.historicalValues) && biomarker.historicalValues.length > 0) {
+                // Create a row for each historical value
+                biomarker.historicalValues.forEach(historicalValue => {
+                    allBiomarkers.push({
+                        category: categoryName,
+                        name: biomarker.name,
+                        status: historicalValue.status || biomarker.status,
+                        value: historicalValue.value || biomarker.value || '',
+                        unit: historicalValue.unit || biomarker.unit || '',
+                        date: historicalValue.date || ''
+                    });
+                });
+            } else {
+                // Fallback to biomarker-level data if no historical values
+                allBiomarkers.push({
+                    category: categoryName,
+                    name: biomarker.name,
+                    status: biomarker.status,
+                    value: biomarker.value || '',
+                    unit: biomarker.unit || '',
+                    date: biomarker.date || ''
+                });
+            }
         });
     });
     
@@ -313,14 +329,30 @@ function convertToTable(data) {
     const allBiomarkers = [];
     Object.entries(data.categories).forEach(([categoryName, category]) => {
         category.biomarkers.forEach(biomarker => {
-            allBiomarkers.push({
-                category: categoryName,
-                name: biomarker.name,
-                status: biomarker.status,
-                value: biomarker.value || '',
-                unit: biomarker.unit || '',
-                date: biomarker.date || ''
-            });
+            // Check if biomarker has historical values
+            if (biomarker.historicalValues && Array.isArray(biomarker.historicalValues) && biomarker.historicalValues.length > 0) {
+                // Create a row for each historical value
+                biomarker.historicalValues.forEach(historicalValue => {
+                    allBiomarkers.push({
+                        category: categoryName,
+                        name: biomarker.name,
+                        status: historicalValue.status || biomarker.status,
+                        value: historicalValue.value || biomarker.value || '',
+                        unit: historicalValue.unit || biomarker.unit || '',
+                        date: historicalValue.date || ''
+                    });
+                });
+            } else {
+                // Fallback to biomarker-level data if no historical values
+                allBiomarkers.push({
+                    category: categoryName,
+                    name: biomarker.name,
+                    status: biomarker.status,
+                    value: biomarker.value || '',
+                    unit: biomarker.unit || '',
+                    date: biomarker.date || ''
+                });
+            }
         });
     });
     
