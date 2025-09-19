@@ -743,11 +743,13 @@ function populateFilterInterface() {
  * @description Toggle latest-only mode
  */
 function toggleLatestOnly() {
+    console.log('🔄 toggleLatestOnly called');
     const latestOnlyButton = document.getElementById('latestOnlyToggle');
     const dateCheckboxes = document.getElementById('dateCheckboxes');
     
     if (latestOnlyButton.classList.contains('active')) {
         // Deactivate latest-only mode
+        console.log('❌ Deactivating Latest Only mode');
         latestOnlyButton.classList.remove('active');
         dateCheckboxes.classList.remove('disabled');
         
@@ -755,6 +757,7 @@ function toggleLatestOnly() {
         document.querySelectorAll('#dateCheckboxes input[type="checkbox"]').forEach(cb => cb.checked = true);
     } else {
         // Activate latest-only mode
+        console.log('✅ Activating Latest Only mode');
         latestOnlyButton.classList.add('active');
         dateCheckboxes.classList.add('disabled');
         
@@ -762,6 +765,7 @@ function toggleLatestOnly() {
         document.querySelectorAll('#dateCheckboxes input[type="checkbox"]').forEach(cb => cb.checked = false);
     }
     
+    console.log('🔄 Calling updateFilterState from toggleLatestOnly');
     updateFilterState();
 }
 
@@ -1259,9 +1263,18 @@ document.addEventListener('DOMContentLoaded', () => {
     
     
     // Export buttons
-    document.getElementById('exportCSV').addEventListener('click', () => exportData('csv'));
-    document.getElementById('exportJSON').addEventListener('click', () => exportData('json'));
-    document.getElementById('exportCopy').addEventListener('click', () => exportData('copy'));
+    document.getElementById('exportCSV').addEventListener('click', () => {
+        console.log('📥 CSV export button clicked');
+        exportData('csv');
+    });
+    document.getElementById('exportJSON').addEventListener('click', () => {
+        console.log('📥 JSON export button clicked');
+        exportData('json');
+    });
+    document.getElementById('exportCopy').addEventListener('click', () => {
+        console.log('📋 Copy button clicked');
+        exportData('copy');
+    });
     
     // Advanced filters toggle
     document.getElementById('advancedToggle').addEventListener('click', toggleAdvancedFilters);
