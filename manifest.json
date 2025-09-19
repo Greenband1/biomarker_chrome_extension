@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Function Health Data Extractor",
+  "name": "Personal Health Data Tool",
   "version": "2.2.0",
   "description": "Extract and export your biomarker data from Function Health into CSV, JSON, and table formats. Not affiliated with Function Health.",
   "permissions": [

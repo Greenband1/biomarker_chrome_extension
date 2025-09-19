@@ -1,25 +1,29 @@
-# Function Health Data Extractor
+# Personal Health Data Tool
 
-A Chrome extension that extracts biomarker data from Function Health into exportable formats (CSV, JSON, table).
+A Chrome extension that extracts biomarker data from health services into exportable formats (CSV, JSON, table).
 
-![Extension Version](https://img.shields.io/badge/version-2.0.1-blue.svg)
+![Extension Version](https://img.shields.io/badge/version-2.2.0-blue.svg)
 ![Chrome Extension](https://img.shields.io/badge/platform-Chrome%20Extension-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-## ⚠️ Disclaimer
+## ⚠️ Legal Disclaimer
 
-**This extension is not affiliated with or endorsed by Function Health.** It is an independent tool created to help users export their own biomarker data for personal use.
+**This project is open-source for personal use only, not affiliated with any health service provider. Users must adhere to the target website's Terms of Service. Consider legal advice before use.**
+
+This extension is an independent tool created to help users export their own biomarker data for personal use only.
 
 ## 🔬 Features
 
-- **🚀 Fast API Extraction** - Direct API access for complete biomarker data with dates
-- **📊 Current Results** - Extract only the most recent result for each biomarker
-- **📈 Historical Data** - Extract complete historical biomarker results across all test dates
-- **📁 Multiple Export Formats** - CSV, JSON, and clipboard-friendly table formats
+- **🎯 One-Click Extraction** - Single "Extract My Biomarkers" button for streamlined workflow
+- **📈 Complete Historical Data** - Automatically extracts all biomarker results across all test dates
+- **🔧 Advanced Filtering** - Filter by specific dates, categories, or get latest results only
+- **⚡ Latest Only Mode** - Get the most recent result for each biomarker with category flexibility
+- **📁 Multiple Export Formats** - CSV, JSON, and clipboard-friendly formats
 - **🏥 Smart Categorization** - Automatically organizes biomarkers by medical category
-- **📅 Date Tracking** - Includes test dates for all biomarker results
-- **✅ Validation** - Ensures you're logged in and on the correct page
-- **📋 Sorted Output** - Results organized by Category → Biomarker → Date
+- **🎨 Progressive Interface** - Export options appear after extraction for clean workflow
+- **🔄 Auto-Navigation** - Automatically navigates to correct page
+- **💾 Session Filters** - Filter preferences persist during your session
+- **✨ Professional Design** - Modern interface with clear visual hierarchy
 
 ## 🚀 Installation
 
@@ -27,8 +31,8 @@ A Chrome extension that extracts biomarker data from Function Health into export
 
 1. **Clone or Download**
    ```bash
-   git clone https://github.com/Greenband1/functionhealth_chrome_extension.git
-   cd functionhealth_chrome_extension
+   git clone https://github.com/Greenband1/biomarker_chrome_extension.git
+   cd biomarker_chrome_extension
    ```
 
 2. **Load in Chrome**
@@ -50,22 +54,27 @@ A Chrome extension that extracts biomarker data from Function Health into export
 
 ### Step-by-Step Guide
 
-1. **Navigate to Function Health**
-   - Go to https://my.functionhealth.com/biomarkers
+1. **Navigate to Health Service**
+   - Go to your health service biomarkers page
    - Ensure you're logged in
 
 2. **Open the Extension**
    - Click the extension icon in your Chrome toolbar
-   - The extension will validate your login and page status
+   - Extension auto-navigates to correct page if needed
 
 3. **Extract Your Data**
-   - **"Extract Current & Historical Results"** - Gets all biomarker data across all test dates
-   - **"Extract Current Results"** - Gets only the most recent result for each biomarker
+   - Click **"Extract My Biomarkers"** to get all historical data
+   - Export options appear after extraction
 
 4. **Export Your Data**
    - **Download CSV** - Excel-compatible spreadsheet format
    - **Download JSON** - Machine-readable format for developers
-   - **Copy Table** - Tab-separated format for pasting into documents
+   - **Copy to Clipboard** - CSV format for pasting into documents
+
+5. **Advanced Filtering (Optional)**
+   - Click **"Advanced Filters"** for customized exports
+   - Use **"Latest Only"** for most recent results per biomarker
+   - Select specific dates and categories
 
 ## 📊 Data Format
 

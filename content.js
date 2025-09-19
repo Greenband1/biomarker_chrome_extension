@@ -1,6 +1,8 @@
+// This tool is for personal, non-commercial use only. Users must be logged in and comply with the target website's Terms of Service.
+
 /**
  * File: content.js
- * Purpose: Extract biomarker data from Function Health pages
+ * Purpose: Extract biomarker data from health service pages
  * Dependencies: None (runs in page context)
  * Last Modified: 2024
  */
