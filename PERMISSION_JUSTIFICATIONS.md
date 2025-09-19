@@ -89,8 +89,8 @@ The extension uses only the absolute minimum permissions necessary for functiona
 - `chrome.runtime.getManifest()` → No permission required
 - `chrome.runtime.onMessage` → No permission required
 
-### **Added Permissions (v2.2.0+)**
-- **`storage`** - Used for session-based filter preferences in Advanced Filters feature. Stores only user's selected date ranges and categories temporarily during session - no sensitive biomarker data stored. Filter preferences reset when popup closes.
+### **Session-Only Features (v2.2.0+)**
+- **Advanced Filters** - Filter preferences are session-only and reset when popup closes. No persistent storage needed or used.
 
 This represents the absolute minimum permission set required for the extension to function.
 
