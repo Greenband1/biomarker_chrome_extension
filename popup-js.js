@@ -770,13 +770,16 @@ function toggleLatestOnly() {
  */
 function updateFilterState() {
     const filtersApplied = areFiltersApplied();
+    console.log('Filter state update:', { filtersApplied, latestOnly: isLatestOnlyActive() });
     setState({ filtersApplied: filtersApplied });
     
     // Apply filters if any are active
     if (filtersApplied) {
+        console.log('Applying filters...');
         applyFilters();
     } else {
         // No filters applied, use original data
+        console.log('No filters applied, using original data');
         setState({ filteredData: null });
     }
 }
@@ -1051,6 +1054,14 @@ async function exportData(format) {
                  appState.extractedData;
     
     const suffix = appState.filtersApplied ? 'filtered' : '';
+    
+    console.log('Export data:', { 
+        format, 
+        filtersApplied: appState.filtersApplied, 
+        hasFilteredData: !!appState.filteredData,
+        usingFilteredData: data === appState.filteredData,
+        latestOnly: isLatestOnlyActive()
+    });
     
     switch (format) {
         case 'csv':
