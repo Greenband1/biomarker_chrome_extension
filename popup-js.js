@@ -1053,9 +1053,9 @@ async function exportData(format) {
     }
     
     // Use filtered data if filters are applied, otherwise use original data
-    const data = appState.filtersApplied && appState.filteredData ? 
-                 appState.filteredData : 
-                 appState.extractedData;
+    let data = appState.filtersApplied && appState.filteredData ? 
+               appState.filteredData : 
+               appState.extractedData;
     
     const suffix = appState.filtersApplied ? 'filtered' : '';
     
@@ -1066,6 +1066,11 @@ async function exportData(format) {
         usingFilteredData: data === appState.filteredData,
         latestOnly: isLatestOnlyActive()
     });
+
+    // Defensive normalization: if Latest Only is active, force-trim dataset
+    if (isLatestOnlyActive()) {
+        data = normalizeToLatestOnlyDataset(data);
+    }
     
     switch (format) {
         case 'csv':
@@ -1077,6 +1082,40 @@ async function exportData(format) {
         case 'copy':
             await copyCSVData(data);
             break;
+    }
+}
+
+/**
+ * @description Create a dataset that contains only the latest result per biomarker
+ * This is a defensive step to guarantee Latest Only exports even if upstream filtering fails
+ */
+function normalizeToLatestOnlyDataset(source) {
+    try {
+        const cloned = JSON.parse(JSON.stringify(source));
+        if (!cloned || !cloned.categories) return source;
+        
+        Object.values(cloned.categories).forEach(category => {
+            if (!category || !Array.isArray(category.biomarkers)) return;
+            category.biomarkers.forEach(biomarker => {
+                if (!biomarker) return;
+                if (Array.isArray(biomarker.historicalValues) && biomarker.historicalValues.length > 0) {
+                    // Pick most recent by date
+                    const latest = [...biomarker.historicalValues]
+                        .filter(v => v && v.date)
+                        .sort((a, b) => new Date(b.date) - new Date(a.date))[0] || biomarker.historicalValues[0];
+                    biomarker.historicalValues = [latest];
+                    // Also mirror top-level convenience fields for exporters that may rely on them
+                    biomarker.status = latest.status || biomarker.status;
+                    biomarker.value = latest.value || biomarker.value;
+                    biomarker.unit = latest.unit || biomarker.unit;
+                    biomarker.date = latest.date || biomarker.date;
+                }
+            });
+        });
+        return cloned;
+    } catch (e) {
+        console.warn('normalizeToLatestOnlyDataset failed; falling back to source', e);
+        return source;
     }
 }
 
