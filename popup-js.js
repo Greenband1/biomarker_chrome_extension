@@ -1258,6 +1258,8 @@ function toggleHelp() {
 
 // Initialize event listeners
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('🚀 DOMContentLoaded - Initializing event listeners');
+    
     // Primary extraction button
     document.getElementById('extractButton').addEventListener('click', extractMyBiomarkers);
     
@@ -1283,7 +1285,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     // Filter controls
-    document.getElementById('latestOnlyToggle').addEventListener('click', toggleLatestOnly);
+    console.log('🔧 Setting up Latest Only button event listener');
+    const latestOnlyBtn = document.getElementById('latestOnlyToggle');
+    if (latestOnlyBtn) {
+        console.log('✅ Latest Only button found, adding event listener');
+        latestOnlyBtn.addEventListener('click', toggleLatestOnly);
+    } else {
+        console.error('❌ Latest Only button NOT found in DOM');
+    }
     document.getElementById('selectAllDates').addEventListener('click', () => {
         document.querySelectorAll('#dateCheckboxes input[type="checkbox"]').forEach(cb => cb.checked = true);
         updateFilterState();
