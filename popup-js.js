@@ -91,24 +91,15 @@ function updateButtonState() {
 }
 
 /**
- * @description Update export zone visibility and content
+ * @description Update export zone visibility
  */
 function updateExportZone() {
     const exportZone = document.getElementById('exportZone');
-    const successMessage = document.getElementById('successMessage');
     
     if (appState.extractionStatus === 'completed' && appState.extractedData) {
-        // Show export zone with success message
+        // Show export zone without redundant success message
         if (exportZone) {
             exportZone.style.display = 'block';
-        }
-        
-        if (successMessage) {
-            const totalBiomarkers = Object.values(appState.extractedData.categories || {})
-                .reduce((sum, cat) => sum + (cat.biomarkers?.length || 0), 0);
-            const totalCategories = Object.keys(appState.extractedData.categories || {}).length;
-            
-            successMessage.textContent = `✅ Found ${totalBiomarkers} biomarkers across ${totalCategories} categories`;
         }
     } else {
         if (exportZone) {
