@@ -22,14 +22,16 @@ Export your biomarker data from Function Health into convenient formats for anal
 
 🔬 KEY FEATURES
 
-✅ Fast API Extraction - Direct API access for complete biomarker data with test dates
-✅ Current Results - Extract only the most recent result for each biomarker  
-✅ Historical Data - Extract complete historical biomarker results across all test dates
-✅ Multiple Export Formats - CSV (Excel-compatible), JSON, and clipboard-friendly table formats
-✅ Smart Categorization - Automatically organizes biomarkers by medical category (Heart & Cardiovascular, Blood & Hematology, Metabolic & Diabetes, etc.)
-✅ Date Tracking - Includes test dates for all biomarker results
-✅ Validation - Ensures you're logged in and on the correct page before extraction
-✅ Sorted Output - Results organized by Category → Biomarker → Date for easy analysis
+✅ One-Click Extraction - Single "Extract My Biomarkers" button for streamlined workflow
+✅ Complete Historical Data - Automatically extracts all biomarker results across all test dates
+✅ Advanced Filtering - Filter by specific dates, categories, or get latest results only
+✅ Latest Only Mode - Get the most recent result for each biomarker with category flexibility
+✅ Multiple Export Formats - CSV (Excel-compatible), JSON, and clipboard-friendly formats
+✅ Smart Categorization - Automatically organizes biomarkers by medical category
+✅ Progressive Interface - Export options appear after extraction for clean workflow
+✅ Auto-Navigation - Automatically navigates to correct Function Health page
+✅ Session Filters - Filter preferences persist during your session
+✅ Professional Design - Modern interface with clear visual hierarchy
 
 📊 BIOMARKER CATEGORIES
 
@@ -48,12 +50,14 @@ Export your biomarker data from Function Health into convenient formats for anal
 🚀 HOW TO USE
 
 1. Log into your Function Health account
-2. Navigate to the biomarkers page (https://my.functionhealth.com/biomarkers)
+2. Navigate to the biomarkers page (extension auto-navigates if needed)
 3. Click the extension icon in your Chrome toolbar
-4. Choose your extraction type:
-   - "Extract Current & Historical Results" - Gets all data across all test dates
-   - "Extract Current Results" - Gets only the most recent result for each biomarker
+4. Click "Extract My Biomarkers" to get all your historical data
 5. Export in your preferred format (CSV, JSON, or copy to clipboard)
+6. Use "Advanced Filters" for customized exports:
+   - Latest Only: Get most recent result per biomarker
+   - Date Selection: Choose specific test dates
+   - Category Filtering: Select biomarker categories
 
 📋 EXPORT FORMATS
 
@@ -71,7 +75,7 @@ Table Format - Tab-separated for easy pasting into documents
 • Uses your existing Function Health login session
 • Extension doesn't store your data permanently
 • No remote code execution - all code is bundled with extension
-• Minimal permissions: only activeTab, scripting, and Function Health domain access
+• Minimal permissions: only activeTab, scripting, storage (for session filters), and Function Health domain access
 • Open source code for full transparency
 
 ⚖️ LEGAL NOTICE
@@ -89,9 +93,11 @@ This extension is for personal use to export your own biomarker data. Please ens
 
 If you encounter issues:
 • Ensure you're logged into Function Health
-• Navigate to the biomarkers page before using the extension
+• Extension only works on functionhealth.com
+• Extension auto-navigates to biomarkers page if needed
+• Click the help icon (ℹ️) in the extension for detailed instructions
 • Refresh the page if extraction fails
-• Check browser console (F12) for detailed error messages
+• Filter settings reset each session - this is intentional
 
 🤝 OPEN SOURCE
 

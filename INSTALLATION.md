@@ -42,11 +42,12 @@ After installation, you should see:
 
 2. **Open the Extension**
    - Click the extension icon
-   - You should see "Ready to extract biomarker data"
+   - You'll see a clean interface with "Extract My Biomarkers" button
 
 3. **Extract Your Data**
-   - Click either extraction button
-   - Export in your preferred format
+   - Click "Extract My Biomarkers" to get all historical data
+   - Export options will appear after extraction
+   - Use "Advanced Filters" for customized exports
 
 ## Troubleshooting
 
@@ -57,7 +58,9 @@ After installation, you should see:
 
 **Extension not working:**
 - Verify you're logged into Function Health
-- Ensure you're on the biomarkers page
+- Extension only works on functionhealth.com
+- Extension auto-navigates to biomarkers page if needed
+- Click the help icon (ℹ️) in the extension for detailed instructions
 - Check browser console (F12) for errors
 
 **Need help?**
