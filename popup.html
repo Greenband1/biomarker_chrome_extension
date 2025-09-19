@@ -7,7 +7,8 @@
     <style>
         body {
             width: 400px;
-            min-height: 300px;
+            min-height: 400px;
+            max-height: 600px;
             padding: 15px;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -23,46 +24,268 @@
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
         }
 
-        h1 {
-            font-size: 20px;
-            margin: 0 0 15px 0;
-            color: #667eea;
-            text-align: center;
-        }
-
-        .button-group {
+        .header {
             display: flex;
-            gap: 10px;
+            align-items: center;
+            justify-content: space-between;
             margin-bottom: 15px;
         }
 
-        button {
+        h1 {
+            font-size: 20px;
+            margin: 0;
+            color: #667eea;
+            flex-grow: 1;
+            text-align: center;
+        }
+
+        .help-button {
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background-color 0.3s ease;
+        }
+
+        .help-button:hover {
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .help-section {
+            margin-bottom: 15px;
+            padding: 16px;
+            background: rgba(102, 126, 234, 0.05);
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        .help-content h3 {
+            margin: 0 0 8px 0;
+            color: #667eea;
+            font-size: 14px;
+        }
+
+        .help-content ol, .help-content ul {
+            margin: 0 0 12px 0;
+            padding-left: 20px;
+        }
+
+        .help-content li {
+            font-size: 12px;
+            line-height: 1.4;
+            margin-bottom: 4px;
+        }
+
+        .help-content strong {
+            color: #495057;
+        }
+
+        /* Primary Action Zone */
+        .primary-action-zone {
+            margin-bottom: 24px;
+        }
+
+        .primary-button {
+            width: 100%;
+            padding: 18px 24px;
+            font-size: 18px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 6px 24px rgba(102, 126, 234, 0.4);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .primary-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(102, 126, 234, 0.5);
+        }
+
+        .primary-button:active {
+            transform: translateY(0);
+        }
+
+        .primary-button:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .primary-button.loading .button-text {
+            opacity: 0.7;
+        }
+
+        .button-spinner {
+            display: none;
+            animation: spin 1s linear infinite;
+        }
+
+        .primary-button.loading .button-spinner {
+            display: inline-block;
+        }
+
+
+        /* Export Zone */
+        .export-zone {
+            border-top: 1px solid rgba(102, 126, 234, 0.15);
+            padding-top: 20px;
+            margin-top: 20px;
+            animation: slideDown 0.4s ease-out;
+        }
+
+        .success-message {
+            background: rgba(40, 167, 69, 0.1);
+            color: #155724;
+            padding: 12px 16px;
+            border-radius: 8px;
+            border-left: 4px solid #28a745;
+            margin-bottom: 16px;
+            font-weight: 500;
+        }
+
+        .export-section {
+            margin-bottom: 16px;
+        }
+
+        .export-title {
+            font-size: 16px;
+            color: #667eea;
+            margin: 0 0 12px 0;
+            font-weight: 600;
+        }
+
+        .export-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .export-button {
             flex: 1;
+            min-width: 100px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            padding: 10px 15px;
+            padding: 10px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 3px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .export-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
+        }
+
+        .export-button:active {
+            transform: translateY(0);
+        }
+
+        .advanced-toggle {
+            width: 100%;
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+            border: 2px solid rgba(102, 126, 234, 0.2);
+            padding: 12px 16px;
             border-radius: 8px;
             cursor: pointer;
             font-size: 14px;
             font-weight: 600;
             transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .advanced-toggle:hover {
+            background: rgba(102, 126, 234, 0.15);
+            border-color: rgba(102, 126, 234, 0.3);
+        }
+
+        .advanced-toggle.applied {
+            background: rgba(40, 167, 69, 0.1);
+            border-color: #28a745;
+            color: #28a745;
+        }
+
+        .advanced-toggle.applied:hover {
+            background: rgba(40, 167, 69, 0.15);
+            border-color: #218838;
+        }
+
+        /* Advanced Filters */
+        .advanced-filters {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease-out;
+            border-top: 1px solid rgba(102, 126, 234, 0.15);
+            margin-top: 16px;
+        }
+
+        .advanced-filters.expanded {
+            max-height: 600px;
+            padding-top: 16px;
+        }
+
+        .advanced-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .advanced-header h3 {
+            margin: 0;
+            color: #667eea;
+            font-size: 16px;
+        }
+
+        .close-advanced {
+            background: none;
+            border: none;
+            font-size: 20px;
+            color: #6c757d;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .close-advanced:hover {
+            background: rgba(108, 117, 125, 0.1);
+        }
+
+        /* Legacy button styles for filters */
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.3s ease;
         }
 
         button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+            transform: translateY(-1px);
         }
 
         button:active {
             transform: translateY(0);
-        }
-
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
         }
 
         #status {
@@ -199,42 +422,298 @@
             margin-top: 15px;
         }
 
+        /* Filter page styles */
+        .filter-page {
+            display: none;
+        }
+
+        .filter-page.active {
+            display: block;
+        }
+
+        .main-page.hidden {
+            display: none;
+        }
+
+        .back-button {
+            background: #6c757d;
+            margin-bottom: 15px;
+        }
+
+        .back-button:hover {
+            background: #5a6268;
+        }
+
+        .filter-group {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .filter-group h3 {
+            margin: 0 0 10px 0;
+            color: #667eea;
+            font-size: 16px;
+        }
+
+        .date-checkboxes {
+            max-height: 120px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 8px;
+            background: white;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            padding: 4px 0;
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            margin-right: 8px;
+        }
+
+
+        .select-all-buttons {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 8px;
+        }
+
+        .select-all-buttons button {
+            flex: 1;
+            padding: 4px 8px;
+            font-size: 12px;
+            background: #e9ecef;
+            color: #495057;
+        }
+
+        .select-all-buttons button:hover {
+            background: #dee2e6;
+        }
+
+        .export-note {
+            font-size: 11px;
+            color: #6c757d;
+            font-style: italic;
+            margin-bottom: 15px;
+            padding: 8px;
+            background: rgba(102, 126, 234, 0.08);
+            border-radius: 4px;
+            border-left: 3px solid #667eea;
+        }
+
+        /* Notification System */
+        .notification-container {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10000;
+            pointer-events: none;
+            max-width: 320px;
+            width: 90%;
+        }
+
+        .notification {
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            font-size: 14px;
+            font-weight: 500;
+            text-align: center;
+            opacity: 0;
+            transform: translateY(-20px) scale(0.95);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: auto;
+        }
+
+        .notification.show {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+
+        .notification.success {
+            color: #155724;
+            border-left: 4px solid #28a745;
+            background: rgba(212, 237, 218, 0.95);
+        }
+
+        .notification.error {
+            color: #721c24;
+            border-left: 4px solid #dc3545;
+            background: rgba(248, 215, 218, 0.95);
+        }
+
+        .notification.info {
+            color: #0c5460;
+            border-left: 4px solid #17a2b8;
+            background: rgba(209, 236, 241, 0.95);
+        }
+
+        .notification.warning {
+            color: #856404;
+            border-left: 4px solid #ffc107;
+            background: rgba(255, 243, 205, 0.95);
+        }
+
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Filter-specific styles */
+        .filter-group {
+            margin-bottom: 20px;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .filter-group h4 {
+            margin: 0 0 8px 0;
+            color: #667eea;
+            font-size: 14px;
+        }
+
+        .select-all-buttons {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+
+        .select-button {
+            flex: 1;
+            padding: 4px 8px;
+            font-size: 11px;
+            background: #e9ecef;
+            color: #495057;
+        }
+
+        .select-button:hover {
+            background: #dee2e6;
+        }
+
+        .latest-only-button {
+            flex: 1;
+            padding: 4px 8px;
+            font-size: 11px;
+            background: #e9ecef;
+            color: #495057;
+            border: 1px solid #ced4da;
+            transition: all 0.3s ease;
+        }
+
+        .latest-only-button:hover {
+            background: #dee2e6;
+        }
+
+        .latest-only-button.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .date-checkboxes.disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        .date-checkboxes.disabled .checkbox-item {
+            color: #6c757d;
+        }
+
+        .filter-actions {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(102, 126, 234, 0.15);
+        }
+
     </style>
 </head>
 <body>
     <div class="container">
         <button id="closeButton" class="close-button">&times;</button>
-        <h1>🩺 Function Health Extractor</h1>
+        <div class="header">
+            <h1>🩺 Function Health Extractor</h1>
+            <button id="helpButton" class="help-button" title="Help & Instructions">ℹ️</button>
+        </div>
         
-        <div id="status"></div>
-        
-        <div class="progress-bar-container" id="progressBarContainer">
-            <div class="progress-bar" id="progressBar">0%</div>
+        <!-- Primary Action Zone -->
+        <div class="primary-action-zone">
+            <button id="extractButton" class="primary-button">
+                <span class="button-text">Extract My Biomarkers</span>
+                <span class="button-spinner" style="display: none;">⚡</span>
+            </button>
         </div>
 
-        <div class="button-group">
-            <button id="extractAPI">⚡ Extract Current & Historical Results</button>
+        <!-- Export Zone (hidden initially) -->
+        <div class="export-zone" id="exportZone" style="display: none;">
+            <div class="success-message" id="successMessage"></div>
+            
+            <div class="export-section">
+                <h3 class="export-title">Export Your Data:</h3>
+                <div class="export-buttons">
+                    <button id="exportCSV" class="export-button">Download CSV</button>
+                    <button id="exportJSON" class="export-button">Download JSON</button>
+                    <button id="exportCopy" class="export-button">📋 Copy</button>
+                </div>
+            </div>
+            
+            <button class="advanced-toggle" id="advancedToggle">
+                🔧 Advanced Filters
+            </button>
+        </div>
+
+        <!-- Advanced Filters (expandable) -->
+        <div class="advanced-filters" id="advancedFilters">
+            <div class="advanced-header">
+                <h3>🔍 Filter Your Data</h3>
+                <button class="close-advanced" id="closeAdvanced">×</button>
+            </div>
+            
+            <div class="filter-group">
+                <h4>📅 Select Test Dates</h4>
+                <div class="select-all-buttons">
+                    <button id="latestOnlyToggle" class="latest-only-button">Latest Only</button>
+                    <button id="selectAllDates" class="select-button">Select All</button>
+                    <button id="selectNoDates" class="select-button">Select None</button>
+                </div>
+                <div class="date-checkboxes" id="dateCheckboxes">
+                    <!-- Date checkboxes will be populated dynamically -->
+                </div>
+            </div>
+            
+            <div class="filter-group">
+                <h4>📊 Select Categories</h4>
+                <div class="select-all-buttons">
+                    <button id="selectAllCategories" class="select-button">Select All</button>
+                    <button id="selectNoCategories" class="select-button">Select None</button>
+                </div>
+                <div class="date-checkboxes" id="categoryCheckboxes">
+                    <!-- Category checkboxes will be populated dynamically -->
+                </div>
+            </div>
+            
         </div>
         
-        <div class="button-group">
-            <button id="extractData">Extract Current Results</button>
-        </div>
-        
-        <div class="button-group">
-            <button id="downloadCSV">Download CSV</button>
-            <button id="downloadJSON">Download JSON</button>
-        </div>
-        
-        <div class="button-group">
-            <button id="copyTable">Copy Table</button>
-        </div>
-        
-        <div class="button-group">
-            <button id="redirectButton" style="display: none;">Go to Biomarkers Page</button>
-        </div>
 
         <div id="stats" class="stats" style="display: none;">
             <div class="stat-item">
@@ -253,18 +732,51 @@
         
         <div id="dataPreview"></div>
         
-        <div class="instructions">
-            <strong>Instructions:</strong><br>
-            1. Navigate to your Function Health biomarkers page<br>
-            2. Click "Extract Current & Historical Results" for complete data with dates<br>
-            3. Click "Extract Current Results" for latest results only<br>
-            4. Download the data in your preferred format
+        <!-- Help Section (hidden by default) -->
+        <div class="help-section" id="helpSection" style="display: none;">
+            <div class="help-content">
+                <h3>📋 How to Use</h3>
+                <ol>
+                    <li><strong>Navigate</strong> to your Function Health biomarkers page</li>
+                    <li><strong>Click "Extract My Biomarkers"</strong> to get all your historical data</li>
+                    <li><strong>Export your data</strong> in CSV, JSON, or copy to clipboard</li>
+                    <li><strong>Use "Advanced Filters"</strong> to customize your data export</li>
+                </ol>
+                
+                <h3>🔧 Advanced Filtering</h3>
+                <ul>
+                    <li><strong>Latest Only:</strong> Get most recent result for each biomarker</li>
+                    <li><strong>Date Selection:</strong> Choose specific test dates to include</li>
+                    <li><strong>Category Filtering:</strong> Select which biomarker categories to export</li>
+                    <li><strong>Smart Export:</strong> Main buttons automatically use your filter settings</li>
+                    <li><strong>Session Filters:</strong> Filter settings reset when popup closes</li>
+                </ul>
+                
+                <h3>💡 Tips & Features</h3>
+                <ul>
+                    <li><strong>Auto-Navigation:</strong> Extension navigates to correct page automatically</li>
+                    <li><strong>Multiple Formats:</strong> CSV for spreadsheets, JSON for developers</li>
+                    <li><strong>Visual Feedback:</strong> Button changes to "Applied" when filters are active</li>
+                    <li><strong>Extended Notifications:</strong> Messages stay visible longer for easier reading</li>
+                </ul>
+                
+                <h3>❓ Troubleshooting</h3>
+                <ul>
+                    <li>Make sure you're logged into Function Health</li>
+                    <li>Extension only works on functionhealth.com</li>
+                    <li>Refresh the page if extraction fails</li>
+                    <li>Filters reset each session - this is intentional behavior</li>
+                </ul>
+            </div>
         </div>
         
         <div class="version">
             <span id="version"></span> • Not Affiliated with Function Health
         </div>
     </div>
+    
+    <!-- Notification Container -->
+    <div class="notification-container" id="notificationContainer"></div>
     
     <script src="popup-js.js"></script>
 </body>
