@@ -854,17 +854,18 @@ function applyFilters() {
                 originalCategory.biomarkers.forEach(biomarker => {
                     const latestEntry = getLatestSnapshotFromBiomarker(biomarker);
                     if (!latestEntry) return;
-                    const existing = nameToLatest.get(biomarker.name);
+                    const key = normalizeBiomarkerKey(biomarker.name);
+                    const existing = nameToLatest.get(key);
                     if (!existing || new Date(latestEntry.date || '1900-01-01') > new Date(existing.date || '1900-01-01')) {
                         const normalized = {
                             ...biomarker,
                             historicalValues: [latestEntry],
                             status: latestEntry.status || biomarker.status,
-                            value: latestEntry.value ?? biomarker.value,
+                            value: formatTiterIfApplicable(biomarker.name, latestEntry.value ?? biomarker.value),
                             unit: latestEntry.unit ?? biomarker.unit,
                             date: latestEntry.date || biomarker.date
                         };
-                        nameToLatest.set(biomarker.name, normalized);
+                        nameToLatest.set(key, normalized);
                     }
                 });
                 filteredCategory.biomarkers = Array.from(nameToLatest.values());
@@ -1114,14 +1115,15 @@ function normalizeToLatestOnlyDataset(source) {
                 if (!biomarker) return;
                 const latestEntry = getLatestSnapshotFromBiomarker(biomarker);
                 if (!latestEntry) return;
-                const existing = nameToLatest.get(biomarker.name);
+                const key = normalizeBiomarkerKey(biomarker.name);
+                const existing = nameToLatest.get(key);
                 const latestDate = new Date(latestEntry.date || '1900-01-01');
                 if (!existing || latestDate > new Date(existing.date || '1900-01-01')) {
-                    nameToLatest.set(biomarker.name, {
+                    nameToLatest.set(key, {
                         ...biomarker,
                         historicalValues: [latestEntry],
                         status: latestEntry.status || biomarker.status,
-                        value: latestEntry.value ?? biomarker.value,
+                        value: formatTiterIfApplicable(biomarker.name, latestEntry.value ?? biomarker.value),
                         unit: latestEntry.unit ?? biomarker.unit,
                         date: latestEntry.date || biomarker.date
                     });
@@ -1166,6 +1168,38 @@ function getLatestSnapshotFromBiomarker(biomarker) {
     if (candidates.length === 0) return null;
     candidates.sort((a, b) => new Date(b.date || '1900-01-01') - new Date(a.date || '1900-01-01'));
     return candidates[0];
+}
+
+/**
+ * @description Normalize biomarker name for deduplication
+ */
+function normalizeBiomarkerKey(name) {
+    if (!name) return '';
+    return String(name)
+        .replace(/\u00A0/g, ' ') // non-breaking spaces to regular
+        .trim()
+        .replace(/\s+/g, ' ')
+        .toLowerCase();
+}
+
+/**
+ * @description Ensure ANA Titer-like values are formatted as ratios (e.g., 1:320)
+ */
+function formatTiterIfApplicable(name, value) {
+    if (!name) return value;
+    const lower = String(name).toLowerCase();
+    if (!lower.includes('titer')) return value;
+    const str = String(value ?? '').trim();
+    if (!str) return str;
+    // Already ratio
+    const ratioMatch = str.match(/^\s*1\s*:\s*(\d+)\s*$/i);
+    if (ratioMatch) return `1:${ratioMatch[1]}`;
+    // Numeric-like (including scientific)
+    if (/^-?\d+(?:\.\d+)?(?:e[+\-]?\d+)?$/i.test(str)) {
+        const num = Number(str);
+        if (!Number.isNaN(num)) return `1:${Math.round(num)}`;
+    }
+    return str;
 }
 
 /**
