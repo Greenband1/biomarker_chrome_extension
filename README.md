@@ -2,7 +2,7 @@
 
 A Chrome extension that extracts biomarker data from health services into exportable formats (CSV, JSON, table).
 
-![Extension Version](https://img.shields.io/badge/version-2.2.0-blue.svg)
+![Extension Version](https://img.shields.io/badge/version-2.2.1-blue.svg)
 ![Chrome Extension](https://img.shields.io/badge/platform-Chrome%20Extension-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
