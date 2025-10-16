@@ -25,7 +25,6 @@ const SELECTORS = {
 let biomarkerData = {};
 let historicalData = {};
 let currentBiomarkerElement = null;
-
 /**
  * @description Extract all biomarker data from the current page
  * @returns {Object} Structured biomarker data with categories and results
@@ -399,26 +398,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         case 'ping':
             sendResponse({ pong: true });
             break;
-            
+        
         case 'extractData':
             const data = extractBiomarkerData();
             sendResponse({ success: true, data: data });
             break;
-            
+        
         case 'getCSV':
             const csv = convertToCSV(request.data);
             sendResponse({ success: true, csv: csv });
             break;
-            
+        
         case 'getTable':
             const table = convertToTable(request.data);
             sendResponse({ success: true, table: table });
             break;
-            
-
-            
-
-            
+        
         case 'extractViaAPI':
             // Check if final API extractor is available
             if (typeof window.extractViaFinalAPI === 'function') {
@@ -431,7 +426,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 sendResponse({ success: false, error: 'Final API extractor not loaded. Please try again.' });
             }
             return true; // Will respond asynchronously
-            
+        
         case 'extractCurrentOnly':
             // Check if current-only API extractor is available
             if (typeof window.extractCurrentResultsOnly === 'function') {
@@ -444,14 +439,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 sendResponse({ success: false, error: 'Current-only API extractor not loaded. Please try again.' });
             }
             return true; // Will respond asynchronously
-            
+        
         default:
             sendResponse({ success: false, error: 'Unknown action' });
     }
     
     return true; // Keep the message channel open for async response
 });
-
-
 
 console.log('Function Health content script loaded and ready');

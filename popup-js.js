@@ -134,6 +134,7 @@ function updateAdvancedFilters() {
             advancedToggle.classList.remove('applied');
         }
     }
+
 }
 
 /**
@@ -161,7 +162,9 @@ async function validatePageAndLogin(tab) {
 
     // Check if on the correct biomarkers page
     const correctUrl = 'https://my.functionhealth.com/biomarkers';
-    if (tab.url !== correctUrl) {
+    const onBiomarkersPage = tab.url && tab.url.startsWith(correctUrl);
+
+    if (!onBiomarkersPage) {
         validation.error = 'wrong_page';
         validation.message = 'Navigating to biomarkers page...';
         validation.shouldAutoNavigate = true;
@@ -180,13 +183,15 @@ async function validatePageAndLogin(tab) {
                 const hasAuthToken = userData && JSON.parse(userData).idToken;
                 
                 // Check for page elements that indicate login status
-                const hasUserElements = document.querySelector('[data-testid*="user"], [class*="user"], [class*="profile"]');
-                const hasLoginForm = document.querySelector('input[type="email"], input[type="password"], [class*="login"], [class*="signin"]');
+                const hasUserElements = document.querySelector('[data-testid*="user"], [data-testid*="avatar"], [class*="user"], [class*="profile"], [aria-label*="Account"], header [data-testid*="header"]');
+                const hasLoginForm = document.querySelector('input[type="email"], input[type="password"], [class*="login"], [class*="signin"], form[action*="login"], form[action*="signin"]');
+                const appShell = document.querySelector('[data-testid*="sidebar"], nav[role="navigation"], [class*="dashboard"]');
                 
                 return {
                     hasAuthToken: !!hasAuthToken,
                     hasUserElements: !!hasUserElements,
                     hasLoginForm: !!hasLoginForm,
+                    hasAppShell: !!appShell,
                     currentUrl: window.location.href,
                     pageTitle: document.title
                 };
@@ -196,15 +201,22 @@ async function validatePageAndLogin(tab) {
         const loginStatus = results[0].result;
         
         if (!loginStatus.hasAuthToken) {
-            validation.error = 'not_logged_in';
-            validation.message = 'Must be logged in to Function Health';
-            validation.instructions = 'Log in to your Function Health account and try again';
-            return validation;
+            const clearlyLoggedOut = loginStatus.hasLoginForm && !loginStatus.hasUserElements && !loginStatus.hasAppShell;
+            if (clearlyLoggedOut) {
+                validation.error = 'not_logged_in';
+                validation.message = 'Must be logged in to Function Health';
+                validation.instructions = 'Log in to your Function Health account and try again';
+                return validation;
+            }
+
+            console.warn('Token lookup failed but UI markers present; continuing with warning.', loginStatus);
+            validation.warning = 'Token not found; continuing in debug mode';
         }
 
         // If we get here, everything looks good - silent success
         validation.isValid = true;
         validation.canProceed = true;
+        validation.warning = validation.warning || null;
         // No success message - silent validation
         return validation;
 
@@ -1431,7 +1443,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('#categoryCheckboxes input[type="checkbox"]').forEach(cb => cb.checked = false);
         updateFilterState();
     });
-    
     
     // Close button
     document.getElementById('closeButton').addEventListener('click', () => window.close());

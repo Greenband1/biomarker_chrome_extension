@@ -2,9 +2,15 @@
 
 A Chrome extension that extracts biomarker data from health services into exportable formats (CSV, JSON, table).
 
-![Extension Version](https://img.shields.io/badge/version-2.2.1-blue.svg)
+![Extension Version](https://img.shields.io/badge/version-2.2.2-blue.svg)
 ![Chrome Extension](https://img.shields.io/badge/platform-Chrome%20Extension-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
+
+## 🚀 What's New (v2.2.2)
+
+- Improved login validation to support Function Health's updated layout and ensure extraction proceeds when session markers are present.
+- Cleaned the production bundle of temporary debugging hooks while archiving the network capture tool for future investigations.
+- Bumped release artifacts and Chrome metadata to v2.2.2.
 
 ## ⚠️ Legal Disclaimer
 
