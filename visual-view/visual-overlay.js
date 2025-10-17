@@ -546,14 +546,16 @@ function createBiomarkerCard(biomarker) {
     card.appendChild(header);
 
     // VISUALIZATION
-    console.log(`[Visual Card] ${biomarker.name}: Rendering chart type=${type}, events=${events.length}`);
+    const parsedRefRange = parseReferenceRange(biomarker.referenceRange);
+    console.log(`[Visual Card] ${biomarker.name}: type=${type}, events=${events.length}, refRange=`, parsedRefRange);
+    
     if (type === 'numeric-band' && events.length > 1) {
         console.log(`[Visual Card] Creating band chart for ${biomarker.name}`);
-        const chart = createBandChart(events);
+        const chart = createBandChart(events, parsedRefRange);
         card.appendChild(chart);
     } else if (type === 'threshold' && events.length > 1) {
         console.log(`[Visual Card] Creating threshold chart for ${biomarker.name}`);
-        const chart = createThresholdChart(events);
+        const chart = createThresholdChart(events, parsedRefRange);
         card.appendChild(chart);
     } else if (type === 'categorical') {
         console.log(`[Visual Card] Creating categorical timeline for ${biomarker.name}`);
@@ -569,24 +571,69 @@ function createBiomarkerCard(biomarker) {
         card.appendChild(chart);
     }
 
-    // FOOTER (history chips)
-    if (events.length > 1 || type === 'categorical') {
-        const footer = createHistoryFooter(events, type);
-        card.appendChild(footer);
+    // FOOTER (trend insight only)
+    if (events.length > 1) {
+        const insight = getTrendInsight(events);
+        if (insight) {
+            const insightBadge = document.createElement('div');
+            insightBadge.className = `fh-trend-insight fh-trend-insight--${insight.type}`;
+            insightBadge.textContent = insight.text;
+            card.appendChild(insightBadge);
+        }
     }
 
     return card;
 }
 
+// ===== REFERENCE RANGE PARSING =====
+
+function parseReferenceRange(rangeString) {
+    if (!rangeString || rangeString === '') return null;
+    
+    const str = String(rangeString).trim();
+    
+    // Pattern: "38.5-50.0" or "38.5 - 50.0"
+    const rangeMatch = str.match(/(\d+\.?\d*)\s*-\s*(\d+\.?\d*)/);
+    if (rangeMatch) {
+        return {
+            type: 'band',
+            lower: parseFloat(rangeMatch[1]),
+            upper: parseFloat(rangeMatch[2])
+        };
+    }
+    
+    // Pattern: "< 5.6" or "<5.6"
+    const lessThanMatch = str.match(/<\s*(\d+\.?\d*)/);
+    if (lessThanMatch) {
+        return {
+            type: 'threshold',
+            direction: 'below',
+            value: parseFloat(lessThanMatch[1])
+        };
+    }
+    
+    // Pattern: "> 400" or ">400"
+    const greaterThanMatch = str.match(/>\s*(\d+\.?\d*)/);
+    if (greaterThanMatch) {
+        return {
+            type: 'threshold',
+            direction: 'above',
+            value: parseFloat(greaterThanMatch[1])
+        };
+    }
+    
+    return null;
+}
+
 // ===== CHART RENDERERS =====
 
-function createBandChart(events) {
+function createBandChart(events, referenceRange) {
     const container = document.createElement('div');
     container.className = 'fh-chart-container';
 
     const width = 600;
     const height = 200;
-    const padding = { top: 20, right: 40, bottom: 40, left: 80 };
+    const padding = { top: 20, right: 40, bottom: 40, left: 100 };
 
     const numericEvents = events
         .map(e => ({ ...e, numericValue: extractNumericValue(e.value) }))
@@ -598,67 +645,105 @@ function createBandChart(events) {
     }
 
     const values = numericEvents.map(e => e.numericValue);
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const range = max - min || 1;
+    const dataMin = Math.min(...values);
+    const dataMax = Math.max(...values);
     
-    // Estimate reference bands (simplified - in production, parse from API)
-    const bandLow = min - range * 0.2;
-    const bandHigh = max + range * 0.2;
-    const chartMin = bandLow;
-    const chartMax = bandHigh;
+    // Use medical reference range if available, otherwise fall back to data-based scaling
+    let chartMin, chartMax, lowerBound, upperBound;
+    
+    if (referenceRange && referenceRange.type === 'band') {
+        lowerBound = referenceRange.lower;
+        upperBound = referenceRange.upper;
+        const rangeSpan = upperBound - lowerBound;
+        
+        // Extend chart to include all data points with padding
+        chartMin = Math.min(lowerBound - rangeSpan * 0.15, dataMin - Math.abs(dataMin) * 0.05);
+        chartMax = Math.max(upperBound + rangeSpan * 0.15, dataMax + Math.abs(dataMax) * 0.05);
+    } else {
+        // Fallback: estimate bands from data
+        const dataRange = dataMax - dataMin || 1;
+        lowerBound = dataMin + dataRange * 0.25;
+        upperBound = dataMin + dataRange * 0.75;
+        chartMin = dataMin - dataRange * 0.1;
+        chartMax = dataMax + dataRange * 0.1;
+    }
+    
     const chartRange = chartMax - chartMin;
 
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
     svg.classList.add('fh-band-chart');
 
-    // Draw bands
-    const bandHeight = (height - padding.top - padding.bottom) / 3;
-    
-    // Above range band (top)
-    const aboveRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    aboveRect.setAttribute('x', padding.left);
-    aboveRect.setAttribute('y', padding.top);
-    aboveRect.setAttribute('width', width - padding.left - padding.right);
-    aboveRect.setAttribute('height', bandHeight);
-    aboveRect.setAttribute('fill', BAND_COLORS.above);
-    svg.appendChild(aboveRect);
+    const chartHeight = height - padding.top - padding.bottom;
+    const chartWidth = width - padding.left - padding.right;
 
-    // In range band (middle)
+    // Calculate Y positions for bounds
+    const yForValue = (value) => {
+        return padding.top + chartHeight - ((value - chartMin) / chartRange) * chartHeight;
+    };
+
+    const upperY = yForValue(upperBound);
+    const lowerY = yForValue(lowerBound);
+
+    // Above range band (if any data points exceed upper bound)
+    const hasAboveRange = values.some(v => v > upperBound);
+    if (hasAboveRange || dataMax > upperBound) {
+        const aboveRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        aboveRect.setAttribute('x', padding.left);
+        aboveRect.setAttribute('y', padding.top);
+        aboveRect.setAttribute('width', chartWidth);
+        aboveRect.setAttribute('height', upperY - padding.top);
+        aboveRect.setAttribute('fill', BAND_COLORS.above);
+        svg.appendChild(aboveRect);
+
+        const aboveLabel = createSVGText('Above Range', padding.left - 5, padding.top + (upperY - padding.top) / 2, 'end', 10, '#8e5b5b');
+        svg.appendChild(aboveLabel);
+        
+        const upperBoundLabel = createSVGText(`> ${upperBound}`, padding.left - 5, upperY - 3, 'end', 9, '#8e5b5b');
+        upperBoundLabel.setAttribute('font-style', 'italic');
+        svg.appendChild(upperBoundLabel);
+    }
+
+    // In range band (between lower and upper bounds)
     const inRangeRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
     inRangeRect.setAttribute('x', padding.left);
-    inRangeRect.setAttribute('y', padding.top + bandHeight);
-    inRangeRect.setAttribute('width', width - padding.left - padding.right);
-    inRangeRect.setAttribute('height', bandHeight);
+    inRangeRect.setAttribute('y', upperY);
+    inRangeRect.setAttribute('width', chartWidth);
+    inRangeRect.setAttribute('height', lowerY - upperY);
     inRangeRect.setAttribute('fill', BAND_COLORS.inRange);
     svg.appendChild(inRangeRect);
 
-    // Below range band (bottom)
-    const belowRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    belowRect.setAttribute('x', padding.left);
-    belowRect.setAttribute('y', padding.top + 2 * bandHeight);
-    belowRect.setAttribute('width', width - padding.left - padding.right);
-    belowRect.setAttribute('height', bandHeight);
-    belowRect.setAttribute('fill', BAND_COLORS.below);
-    svg.appendChild(belowRect);
-
-    // Band labels
-    const aboveLabel = createSVGText('Above Range', padding.left - 5, padding.top + bandHeight / 2, 'end', 10, '#8e5b5b');
-    const inRangeLabel = createSVGText('In Range', padding.left - 5, padding.top + 1.5 * bandHeight, 'end', 10, '#2a7d5f');
-    const belowLabel = createSVGText('Below Range', padding.left - 5, padding.top + 2.5 * bandHeight, 'end', 10, '#9d7030');
-    
-    svg.appendChild(aboveLabel);
+    const inRangeLabel = createSVGText('In Range', padding.left - 5, upperY + (lowerY - upperY) / 2, 'end', 11, '#2a7d5f');
+    inRangeLabel.setAttribute('font-weight', '600');
     svg.appendChild(inRangeLabel);
-    svg.appendChild(belowLabel);
+    
+    const rangeText = createSVGText(`${lowerBound}–${upperBound}`, padding.left - 5, upperY + (lowerY - upperY) / 2 + 12, 'end', 9, '#2a7d5f');
+    rangeText.setAttribute('font-style', 'italic');
+    svg.appendChild(rangeText);
+
+    // Below range band (if any data points below lower bound)
+    const hasBelowRange = values.some(v => v < lowerBound);
+    if (hasBelowRange || dataMin < lowerBound) {
+        const belowRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        belowRect.setAttribute('x', padding.left);
+        belowRect.setAttribute('y', lowerY);
+        belowRect.setAttribute('width', chartWidth);
+        belowRect.setAttribute('height', (height - padding.bottom) - lowerY);
+        belowRect.setAttribute('fill', BAND_COLORS.below);
+        svg.appendChild(belowRect);
+
+        const belowLabel = createSVGText('Below Range', padding.left - 5, lowerY + ((height - padding.bottom) - lowerY) / 2, 'end', 10, '#9d7030');
+        svg.appendChild(belowLabel);
+        
+        const lowerBoundLabel = createSVGText(`< ${lowerBound}`, padding.left - 5, lowerY + 12, 'end', 9, '#9d7030');
+        lowerBoundLabel.setAttribute('font-style', 'italic');
+        svg.appendChild(lowerBoundLabel);
+    }
 
     // Plot points and line
-    const chartWidth = width - padding.left - padding.right;
-    const chartHeight = height - padding.top - padding.bottom;
-    
     const points = numericEvents.map((event, index) => {
         const x = padding.left + (chartWidth / (numericEvents.length - 1 || 1)) * index;
-        const y = padding.top + chartHeight - ((event.numericValue - chartMin) / chartRange) * chartHeight;
+        const y = yForValue(event.numericValue);
         return { x, y, event };
     });
 
@@ -693,23 +778,23 @@ function createBandChart(events) {
 
         // Value label above point
         const valueLabel = createSVGText(
-            String(point.event.numericValue),
+            point.event.value || String(point.event.numericValue),
             point.x,
-            point.y - 12,
+            point.y - 14,
             'middle',
-            11,
+            12,
             '#2d334c'
         );
-        valueLabel.setAttribute('font-weight', '600');
+        valueLabel.setAttribute('font-weight', '700');
         svg.appendChild(valueLabel);
 
         // Date label below
         const dateLabel = createSVGText(
             formatShortDate(point.event.date),
             point.x,
-            height - padding.bottom + 20,
+            height - padding.bottom + 18,
             'middle',
-            10,
+            11,
             '#6c748c'
         );
         svg.appendChild(dateLabel);
@@ -719,13 +804,13 @@ function createBandChart(events) {
     return container;
 }
 
-function createThresholdChart(events) {
+function createThresholdChart(events, referenceRange) {
     const container = document.createElement('div');
     container.className = 'fh-chart-container fh-chart-threshold';
 
     const width = 600;
     const height = 120;
-    const padding = { top: 20, right: 40, bottom: 30, left: 80 };
+    const padding = { top: 20, right: 40, bottom: 30, left: 100 };
 
     const numericEvents = events
         .map(e => ({ ...e, numericValue: extractNumericValue(e.value) }))
@@ -1529,57 +1614,13 @@ function injectStyles() {
             font-size: 16px;
         }
 
-        .fh-bio-footer {
-            display: grid;
-            gap: 12px;
-            padding-top: 6px;
-        }
-
-        .fh-history-chips {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-
-        .fh-history-chip {
-            font-size: 11px;
-            padding: 6px 11px;
-            border-radius: 999px;
-            font-weight: 600;
-            letter-spacing: 0.01em;
-        }
-
-        .fh-history-chip.fh-status-in-range {
-            background: rgba(48, 196, 141, 0.16);
-            color: #1e805c;
-        }
-
-        .fh-history-chip.fh-status-out-of-range {
-            background: rgba(247, 112, 112, 0.16);
-            color: #b23e3e;
-        }
-
-        .fh-history-chip.fh-status-improving {
-            background: rgba(247, 178, 103, 0.16);
-            color: #a86b2a;
-        }
-
-        .fh-history-chip.fh-status-unknown {
-            background: rgba(164, 168, 194, 0.16);
-            color: #606477;
-        }
-
-        .fh-history-chip--more {
-            background: rgba(102, 126, 234, 0.12);
-            color: #555f9a;
-        }
-
         .fh-trend-insight {
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 600;
-            padding: 8px 12px;
+            padding: 10px 14px;
             border-radius: 10px;
             display: inline-block;
+            margin-top: 4px;
         }
 
         .fh-trend-insight--improving {
