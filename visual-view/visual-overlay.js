@@ -7,10 +7,13 @@ const STATUS_COLORS = {
 
 const VisualOverlay = {
     container: null,
-    canvas: null,
-    insights: null,
+    content: null,
     statusBar: null,
     dataCache: null,
+    toolbar: null,
+    dropdown: null,
+    selectedCategories: null,
+    dropdownOpen: false,
 
     open(payload) {
         if (!payload || !payload.dataset) {
@@ -70,32 +73,37 @@ const VisualOverlay = {
         const body = document.createElement('div');
         body.className = 'fh-visual-body';
 
-        const canvas = document.createElement('div');
-        canvas.className = 'fh-visual-canvas';
+        const content = document.createElement('div');
+        content.className = 'fh-visual-content';
 
-        const insights = document.createElement('aside');
-        insights.className = 'fh-visual-insights';
-
-        body.appendChild(canvas);
-        body.appendChild(insights);
+        body.appendChild(content);
         panel.appendChild(body);
         overlay.appendChild(panel);
         document.body.appendChild(overlay);
 
         document.addEventListener('keydown', this.handleKeydown);
+        document.addEventListener('click', (event) => {
+            if (this.dropdownOpen && this.dropdown && !this.dropdown.contains(event.target) && !this.toolbar?.contains(event.target)) {
+                this.closeDropdown();
+            }
+        });
 
         this.container = overlay;
-        this.canvas = canvas;
-        this.insights = insights;
+        this.content = content;
         this.statusBar = statusBar;
     },
 
     render() {
-        if (!this.dataCache || !this.container) return;
+        if (!this.dataCache || !this.content) return;
         const { dataset, filtersApplied, latestOnly } = this.dataCache;
+
+        if (!this.selectedCategories) {
+            this.selectedCategories = new Set(Object.keys(dataset.categories));
+        }
+
         this.renderStatusBar(dataset, filtersApplied, latestOnly);
-        this.renderInsights(dataset);
-        this.renderCanvas(dataset);
+        this.renderToolbar(dataset);
+        this.renderCards(dataset);
     },
 
     renderStatusBar(dataset, filtersApplied, latestOnly) {
@@ -115,54 +123,200 @@ const VisualOverlay = {
         });
     },
 
-    renderInsights(dataset) {
-        if (!this.insights) return;
-        this.insights.innerHTML = '';
+    renderToolbar(dataset) {
+        if (!this.content) return;
+        if (!this.toolbar) {
+            const toolbar = document.createElement('div');
+            toolbar.className = 'fh-visual-toolbar';
 
-        const heading = document.createElement('h3');
-        heading.textContent = 'Categories';
-        this.insights.appendChild(heading);
+            const categoryControl = document.createElement('div');
+            categoryControl.className = 'fh-toolbar-control';
 
-        const list = document.createElement('ul');
-        list.className = 'fh-category-list';
+            const label = document.createElement('span');
+            label.textContent = 'Categories';
 
-        Object.entries(dataset.categories)
-            .sort(([a], [b]) => a.localeCompare(b))
-            .forEach(([name, category]) => {
-                const item = document.createElement('li');
-                const button = document.createElement('button');
-                button.type = 'button';
-                button.textContent = `${name} (${category.biomarkers.length})`;
-                button.addEventListener('click', () => {
-                    const anchor = this.canvas?.querySelector(`[data-category="${cssEscape(name)}"]`);
-                    if (anchor) {
-                        anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }
-                });
-                item.appendChild(button);
-                list.appendChild(item);
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'fh-select-button';
+            button.textContent = 'All categories';
+            button.addEventListener('click', (event) => {
+                event.stopPropagation();
+                this.toggleDropdown(dataset);
             });
 
-        this.insights.appendChild(list);
+            const chipContainer = document.createElement('div');
+            chipContainer.className = 'fh-selected-chips';
+
+            categoryControl.appendChild(label);
+            categoryControl.appendChild(button);
+            toolbar.appendChild(categoryControl);
+            toolbar.appendChild(chipContainer);
+
+            this.content.innerHTML = '';
+            this.content.appendChild(toolbar);
+            this.toolbar = toolbar;
+            this.selectButton = button;
+            this.selectedChips = chipContainer;
+        }
+
+        this.updateCategorySelection(dataset);
     },
 
-    renderCanvas(dataset) {
-        if (!this.canvas) return;
-        this.canvas.innerHTML = '';
+    toggleDropdown(dataset) {
+        if (this.dropdownOpen) {
+            this.closeDropdown();
+            return;
+        }
+        const dropdown = document.createElement('div');
+        dropdown.className = 'fh-select-dropdown';
+
+        const searchInput = document.createElement('input');
+        searchInput.type = 'search';
+        searchInput.placeholder = 'Search categories';
+        searchInput.className = 'fh-select-search';
+
+        const list = document.createElement('div');
+        list.className = 'fh-select-list';
+
+        const categories = Object.keys(dataset.categories).sort((a, b) => a.localeCompare(b));
+
+        const buildList = (query = '') => {
+            list.innerHTML = '';
+            categories
+                .filter((name) => name.toLowerCase().includes(query.toLowerCase()))
+                .forEach((name) => {
+                    const item = document.createElement('label');
+                    item.className = 'fh-select-item';
+
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.checked = this.selectedCategories.has(name);
+                    checkbox.addEventListener('change', () => {
+                        if (checkbox.checked) {
+                            this.selectedCategories.add(name);
+                        } else {
+                            this.selectedCategories.delete(name);
+                            if (this.selectedCategories.size === 0) {
+                                // Prevent empty state: default back to all
+                                categories.forEach((cat) => this.selectedCategories.add(cat));
+                            }
+                        }
+                        this.updateCategorySelection(dataset);
+                        this.renderCards(dataset);
+                    });
+
+                    item.appendChild(checkbox);
+                    const span = document.createElement('span');
+                    span.textContent = name;
+                    item.appendChild(span);
+                    list.appendChild(item);
+                });
+        };
+
+        searchInput.addEventListener('input', () => buildList(searchInput.value));
+
+        const actions = document.createElement('div');
+        actions.className = 'fh-select-actions';
+
+        const selectAllBtn = document.createElement('button');
+        selectAllBtn.type = 'button';
+        selectAllBtn.textContent = 'Select all';
+        selectAllBtn.addEventListener('click', () => {
+            categories.forEach((cat) => this.selectedCategories.add(cat));
+            this.updateCategorySelection(dataset);
+            this.renderCards(dataset);
+            buildList(searchInput.value);
+        });
+
+        const clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.textContent = 'Clear';
+        clearBtn.addEventListener('click', () => {
+            this.selectedCategories.clear();
+            categories.forEach((cat) => this.selectedCategories.add(cat));
+            this.updateCategorySelection(dataset);
+            this.renderCards(dataset);
+            buildList(searchInput.value);
+        });
+
+        actions.appendChild(selectAllBtn);
+        actions.appendChild(clearBtn);
+
+        dropdown.appendChild(searchInput);
+        dropdown.appendChild(actions);
+        dropdown.appendChild(list);
+
+        this.toolbar.appendChild(dropdown);
+        this.dropdown = dropdown;
+        this.dropdownOpen = true;
+        buildList();
+        searchInput.focus({ preventScroll: true });
+    },
+
+    closeDropdown() {
+        if (!this.dropdown) return;
+        this.dropdown.remove();
+        this.dropdown = null;
+        this.dropdownOpen = false;
+    },
+
+    updateCategorySelection(dataset) {
+        const categories = Object.keys(dataset.categories).sort((a, b) => a.localeCompare(b));
+        if (!this.selectedCategories || this.selectedCategories.size === 0) {
+            this.selectedCategories = new Set(categories);
+        }
+
+        if (this.selectButton) {
+            const label = this.selectedCategories.size === categories.length
+                ? 'All categories'
+                : `${this.selectedCategories.size} selected`;
+            this.selectButton.textContent = label;
+        }
+
+        if (this.selectedChips) {
+            this.selectedChips.innerHTML = '';
+            const selected = categories.filter((cat) => this.selectedCategories.has(cat));
+            selected.slice(0, 6).forEach((cat) => {
+                const chip = document.createElement('span');
+                chip.className = 'fh-chip fh-chip--ghost';
+                chip.textContent = cat;
+                chip.addEventListener('click', () => {
+                    if (this.selectedCategories.size > 1) {
+                        this.selectedCategories.delete(cat);
+                        this.updateCategorySelection(dataset);
+                        this.renderCards(dataset);
+                    }
+                });
+                this.selectedChips.appendChild(chip);
+            });
+            if (selected.length > 6) {
+                const moreChip = document.createElement('span');
+                moreChip.className = 'fh-chip fh-chip--ghost';
+                moreChip.textContent = `+${selected.length - 6} more`;
+                this.selectedChips.appendChild(moreChip);
+            }
+        }
+    },
+
+    renderCards(dataset) {
+        if (!this.content) return;
+        const existingList = this.content.querySelector('.fh-bio-grid');
+        if (existingList) {
+            existingList.remove();
+        }
+
+        const list = document.createElement('div');
+        list.className = 'fh-bio-grid';
 
         Object.entries(dataset.categories)
             .sort(([a], [b]) => a.localeCompare(b))
             .forEach(([categoryName, category]) => {
-                if (!Array.isArray(category?.biomarkers) || category.biomarkers.length === 0) {
-                    return;
-                }
+                if (!this.selectedCategories.has(categoryName)) return;
+                if (!Array.isArray(category?.biomarkers) || category.biomarkers.length === 0) return;
 
-                const section = document.createElement('section');
-                section.className = 'fh-visual-section';
-                section.dataset.category = categoryName;
-
-                const header = document.createElement('header');
-                header.className = 'fh-visual-section-header';
+                const categoryHeader = document.createElement('div');
+                categoryHeader.className = 'fh-category-header';
+                categoryHeader.dataset.category = categoryName;
 
                 const title = document.createElement('h3');
                 title.textContent = categoryName;
@@ -170,12 +324,9 @@ const VisualOverlay = {
                 const meta = document.createElement('span');
                 meta.textContent = `${category.biomarkers.length} biomarkers`;
 
-                header.appendChild(title);
-                header.appendChild(meta);
-                section.appendChild(header);
-
-                const list = document.createElement('div');
-                list.className = 'fh-visual-biomarker-list';
+                categoryHeader.appendChild(title);
+                categoryHeader.appendChild(meta);
+                list.appendChild(categoryHeader);
 
                 category.biomarkers
                     .slice()
@@ -184,10 +335,9 @@ const VisualOverlay = {
                         const card = createBiomarkerCard(biomarker);
                         list.appendChild(card);
                     });
-
-                section.appendChild(list);
-                this.canvas.appendChild(section);
             });
+
+        this.content.appendChild(list);
     },
 
     close() {
@@ -197,9 +347,11 @@ const VisualOverlay = {
             if (this.container && !this.container.classList.contains('fh-visual-overlay--open')) {
                 this.container.remove();
                 this.container = null;
-                this.canvas = null;
-                this.insights = null;
+                this.content = null;
                 this.statusBar = null;
+                this.toolbar = null;
+                this.dropdown = null;
+                this.dropdownOpen = false;
                 document.removeEventListener('keydown', this.handleKeydown);
                 document.body.classList.remove('fh-visual-no-scroll');
             }
@@ -221,60 +373,134 @@ function createBiomarkerCard(biomarker) {
     const header = document.createElement('div');
     header.className = 'fh-bio-card-header';
 
+    const titleRow = document.createElement('div');
+    titleRow.className = 'fh-bio-title-row';
+
     const name = document.createElement('h4');
     name.textContent = biomarker.name;
 
-    const latest = getMostRecentEntry(biomarker);
+    const latestEntry = getMostRecentEntry(biomarker);
     const badge = document.createElement('span');
-    badge.className = `fh-status-badge fh-status-${normalizeStatus(latest?.status)}`;
-    badge.textContent = latest?.status ?? 'Unknown';
+    badge.className = `fh-status-badge fh-status-${normalizeStatus(latestEntry?.status)}`;
+    badge.textContent = latestEntry?.status ?? 'Unknown';
 
-    header.appendChild(name);
-    header.appendChild(badge);
+    titleRow.appendChild(name);
+    titleRow.appendChild(badge);
 
-    const timeline = document.createElement('div');
-    timeline.className = 'fh-bio-timeline';
+    const hero = document.createElement('div');
+    hero.className = 'fh-bio-hero';
+
+    const valueBlock = document.createElement('div');
+    valueBlock.className = 'fh-bio-hero-block';
+
+    const valueLabel = document.createElement('span');
+    valueLabel.className = 'fh-bio-hero-value';
+    valueLabel.textContent = formatValue(latestEntry?.value, latestEntry?.unit);
+
+    const dateLabel = document.createElement('span');
+    dateLabel.className = 'fh-bio-hero-meta';
+    dateLabel.textContent = formatDisplayDate(latestEntry?.date);
+
+    valueBlock.appendChild(valueLabel);
+    valueBlock.appendChild(dateLabel);
+
+    hero.appendChild(valueBlock);
 
     const events = buildTimelineEvents(biomarker);
-    events.forEach((event, index) => {
-        const node = document.createElement('div');
-        node.className = 'fh-timeline-node';
+    const direction = getDirection(events);
+    const directionBlock = document.createElement('div');
+    directionBlock.className = `fh-direction fh-direction--${direction}`;
+    directionBlock.textContent = direction === 'up' ? '▲ Rising' : direction === 'down' ? '▼ Falling' : '→ Stable';
+    hero.appendChild(directionBlock);
 
-        if (index > 0) {
-            const connector = document.createElement('div');
-            connector.className = 'fh-timeline-connector';
-            node.appendChild(connector);
-        }
+    header.appendChild(titleRow);
+    header.appendChild(hero);
+    card.appendChild(header);
 
-        const dot = document.createElement('div');
-        dot.className = 'fh-timeline-dot';
-        dot.style.background = STATUS_COLORS[event.status] || STATUS_COLORS.Unknown;
-        dot.title = `${formatDisplayDate(event.date)}\n${event.status} • ${formatValue(event.value, event.unit)}`;
+    const trend = document.createElement('div');
+    trend.className = 'fh-bio-trend';
+    const sparkline = createSparkline(events);
+    trend.appendChild(sparkline);
+    card.appendChild(trend);
 
-        const value = document.createElement('div');
-        value.className = 'fh-timeline-value';
-        value.textContent = formatValue(event.value, event.unit);
-
-        const date = document.createElement('div');
-        date.className = 'fh-timeline-date';
-        date.textContent = formatDisplayDate(event.date);
-
-        node.appendChild(dot);
-        node.appendChild(value);
-        node.appendChild(date);
-        timeline.appendChild(node);
+    const timeline = document.createElement('div');
+    timeline.className = 'fh-bio-timeline-chips';
+    events.slice().reverse().forEach((event) => {
+        const chip = document.createElement('span');
+        chip.className = `fh-timeline-chip fh-status-${normalizeStatus(event.status)}`;
+        chip.textContent = `${formatDisplayDate(event.date)} • ${formatValue(event.value, event.unit)}`;
+        timeline.appendChild(chip);
     });
+    card.appendChild(timeline);
 
-    if (events.length === 0) {
-        const empty = document.createElement('div');
-        empty.className = 'fh-timeline-empty';
-        empty.textContent = 'No test results available';
-        timeline.appendChild(empty);
+    return card;
+}
+
+function createSparkline(events) {
+    const numericEvents = events
+        .map((event) => ({
+            date: event.date,
+            status: event.status,
+            rawValue: event.value,
+            unit: event.unit,
+            value: parseFloat(String(event.value).replace(/[^0-9.\-]/g, ''))
+        }))
+        .filter((event) => !Number.isNaN(event.value));
+
+    const width = 220;
+    const height = 60;
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    svg.setAttribute('preserveAspectRatio', 'none');
+    svg.classList.add('fh-sparkline');
+
+    if (numericEvents.length < 2) {
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', 0);
+        line.setAttribute('y1', height / 2);
+        line.setAttribute('x2', width);
+        line.setAttribute('y2', height / 2);
+        line.setAttribute('stroke', '#d5d8f4');
+        line.setAttribute('stroke-width', '2');
+        svg.appendChild(line);
+        return svg;
     }
 
-    card.appendChild(header);
-    card.appendChild(timeline);
-    return card;
+    const minValue = Math.min(...numericEvents.map((event) => event.value));
+    const maxValue = Math.max(...numericEvents.map((event) => event.value));
+    const range = maxValue - minValue || 1;
+
+    const points = numericEvents.map((event, index) => {
+        const x = (width / (numericEvents.length - 1)) * index;
+        const y = height - ((event.value - minValue) / range) * height;
+        return { x, y, event };
+    });
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const pathData = points
+        .map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x.toFixed(2)},${point.y.toFixed(2)}`)
+        .join(' ');
+    path.setAttribute('d', pathData);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', '#6471f5');
+    path.setAttribute('stroke-width', '2.2');
+    path.setAttribute('stroke-linecap', 'round');
+    svg.appendChild(path);
+
+    points.forEach((point) => {
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', point.x);
+        circle.setAttribute('cy', point.y);
+        circle.setAttribute('r', 4.2);
+        circle.setAttribute('fill', STATUS_COLORS[point.event.status] || STATUS_COLORS.Unknown);
+        circle.setAttribute('stroke', '#ffffff');
+        circle.setAttribute('stroke-width', '1.5');
+        circle.setAttribute('data-tooltip', `${formatDisplayDate(point.event.date)} • ${formatValue(point.event.rawValue, point.event.unit)} (${point.event.status})`);
+        svg.appendChild(circle);
+    });
+
+    return svg;
 }
 
 function buildTimelineEvents(biomarker) {
@@ -308,6 +534,18 @@ function buildTimelineEvents(biomarker) {
 function getMostRecentEntry(biomarker) {
     const events = buildTimelineEvents(biomarker);
     return events[events.length - 1];
+}
+
+function getDirection(events) {
+    const numericEvents = events
+        .map((event) => parseFloat(String(event.value).replace(/[^0-9.\-]/g, '')))
+        .filter((value) => !Number.isNaN(value));
+    if (numericEvents.length < 2) return 'flat';
+    const last = numericEvents[numericEvents.length - 1];
+    const prev = numericEvents[numericEvents.length - 2];
+    if (last > prev) return 'up';
+    if (last < prev) return 'down';
+    return 'flat';
 }
 
 function normalizeStatus(status) {
@@ -403,6 +641,12 @@ function injectStyles() {
             letter-spacing: 0.02em;
         }
 
+        .fh-chip--ghost {
+            background: rgba(102, 126, 234, 0.12);
+            color: #4a55a2;
+            cursor: pointer;
+        }
+
         .fh-visual-close {
             margin-left: 16px;
             width: 42px;
@@ -424,113 +668,164 @@ function injectStyles() {
         }
 
         .fh-visual-body {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) 310px;
+            overflow: hidden auto;
+            padding: 0 24px 24px;
+        }
+
+        .fh-visual-content {
+            display: flex;
+            flex-direction: column;
             gap: 18px;
-            padding: 18px 24px 24px;
-            overflow: hidden;
-            position: relative;
         }
 
-        .fh-visual-canvas {
-            overflow-y: auto;
-            padding-right: 6px;
+        .fh-visual-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            align-items: center;
+            padding-top: 18px;
         }
 
-        .fh-visual-insights {
-            background: rgba(255, 255, 255, 0.88);
-            border-radius: 16px;
-            padding: 16px;
-            box-shadow: inset 0 0 0 1px rgba(102, 126, 234, 0.15);
-            overflow-y: auto;
+        .fh-toolbar-control {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
         }
 
-        .fh-visual-insights h3 {
-            margin: 0 0 12px;
-            font-size: 15px;
-            color: #364360;
-            font-weight: 700;
+        .fh-toolbar-control span {
+            font-size: 12px;
+            font-weight: 600;
+            color: #53618c;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
         }
 
-        .fh-category-list {
-            list-style: none;
-            margin: 0;
-            padding: 0;
-            display: grid;
+        .fh-select-button {
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            background: rgba(255, 255, 255, 0.92);
+            padding: 8px 14px;
+            border-radius: 10px;
+            font-size: 13px;
+            color: #49538d;
+            cursor: pointer;
+            min-width: 180px;
+            text-align: left;
+        }
+
+        .fh-selected-chips {
+            display: flex;
+            flex-wrap: wrap;
             gap: 8px;
         }
 
-        .fh-category-list li button {
-            width: 100%;
-            padding: 8px 12px;
-            border-radius: 10px;
-            border: 1px solid rgba(102, 126, 234, 0.2);
-            background: rgba(102, 126, 234, 0.08);
-            color: #505c8a;
+        .fh-select-dropdown {
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 0;
+            z-index: 10;
+            width: 260px;
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(51, 57, 100, 0.18);
+            border: 1px solid rgba(102, 126, 234, 0.18);
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .fh-select-search {
+            padding: 8px 10px;
+            border-radius: 8px;
+            border: 1px solid rgba(102, 126, 234, 0.28);
             font-size: 13px;
+        }
+
+        .fh-select-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .fh-select-actions button {
+            flex: 1;
+            padding: 6px 8px;
+            border-radius: 8px;
+            border: 1px solid rgba(102, 126, 234, 0.25);
+            background: rgba(102, 126, 234, 0.1);
+            color: #515a94;
+            font-size: 12px;
             cursor: pointer;
-            text-align: left;
-            transition: background 0.2s ease, transform 0.2s ease;
         }
 
-        .fh-category-list li button:hover {
-            background: rgba(102, 126, 234, 0.16);
-            transform: translateX(3px);
+        .fh-select-list {
+            max-height: 200px;
+            overflow-y: auto;
+            display: grid;
+            gap: 6px;
         }
 
-        .fh-visual-section {
-            margin-bottom: 28px;
-            border-radius: 16px;
-            background: rgba(255, 255, 255, 0.95);
-            box-shadow: 0 18px 40px rgba(102, 126, 234, 0.12);
-            padding: 18px;
-            border: 1px solid rgba(102, 126, 234, 0.15);
+        .fh-select-item {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            font-size: 13px;
+            color: #414674;
         }
 
-        .fh-visual-section-header {
+        .fh-select-item input {
+            accent-color: #667eea;
+        }
+
+        .fh-bio-grid {
+            display: grid;
+            gap: 16px;
+        }
+
+        .fh-category-header {
             display: flex;
             align-items: baseline;
             justify-content: space-between;
-            gap: 12px;
-            margin-bottom: 16px;
+            margin-top: 16px;
+            padding: 4px 2px;
         }
 
-        .fh-visual-section-header h3 {
+        .fh-category-header h3 {
             margin: 0;
-            font-size: 18px;
-            color: #2f3756;
+            font-size: 17px;
+            color: #27304d;
         }
 
-        .fh-visual-section-header span {
-            font-size: 13px;
-            color: #6e7591;
+        .fh-category-header span {
+            font-size: 12px;
+            color: #6d7391;
         }
 
-        .fh-visual-biomarker-list {
+        .fh-bio-card {
+            border-radius: 16px;
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(246, 247, 251, 0.96));
+            padding: 16px 18px;
+            box-shadow: 0 16px 40px rgba(48, 55, 99, 0.12);
+            border: 1px solid rgba(102, 126, 234, 0.12);
             display: grid;
             gap: 14px;
         }
 
-        .fh-bio-card {
-            border-radius: 14px;
-            background: linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(246, 247, 251, 0.96));
-            padding: 14px 16px;
-            box-shadow: 0 12px 32px rgba(47, 56, 96, 0.08);
+        .fh-bio-card-header {
+            display: grid;
+            gap: 10px;
         }
 
-        .fh-bio-card-header {
+        .fh-bio-title-row {
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 12px;
-            margin-bottom: 10px;
         }
 
         .fh-bio-card-header h4 {
             margin: 0;
-            font-size: 16px;
-            color: #2e3a59;
-            font-weight: 700;
+            font-size: 17px;
+            color: #2e3658;
         }
 
         .fh-status-badge {
@@ -548,70 +843,92 @@ function injectStyles() {
         .fh-status-improving { background: #f7b267; }
         .fh-status-unknown { background: #94a0be; }
 
-        .fh-bio-timeline {
+        .fh-bio-hero {
             display: flex;
-            gap: 18px;
-            overflow-x: auto;
-            padding-bottom: 6px;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
         }
 
-        .fh-timeline-node {
+        .fh-bio-hero-block {
             display: grid;
-            grid-template-rows: auto auto auto;
-            gap: 6px;
-            align-items: start;
-            justify-items: center;
-            position: relative;
-            min-width: 92px;
+            gap: 4px;
         }
 
-        .fh-timeline-connector {
-            position: absolute;
-            left: 50%;
-            top: 8px;
-            width: 120px;
-            height: 2px;
-            background: linear-gradient(90deg, rgba(102, 126, 234, 0.16), rgba(102, 126, 234, 0.5));
-            transform: translateX(-50%);
+        .fh-bio-hero-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #243057;
         }
 
-        .fh-timeline-dot {
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.18);
-        }
-
-        .fh-timeline-value {
-            font-size: 14px;
-            font-weight: 600;
-            color: #2d334c;
-        }
-
-        .fh-timeline-date {
-            font-size: 12px;
-            color: #6c748c;
-        }
-
-        .fh-timeline-empty {
+        .fh-bio-hero-meta {
             font-size: 13px;
-            color: #7a829c;
-            font-style: italic;
+            color: #6a7395;
         }
+
+        .fh-direction {
+            font-size: 13px;
+            font-weight: 600;
+            padding: 6px 10px;
+            border-radius: 10px;
+        }
+
+        .fh-direction--up {
+            color: #1c8f63;
+            background: rgba(48, 196, 141, 0.16);
+        }
+
+        .fh-direction--down {
+            color: #d45b5b;
+            background: rgba(247, 112, 112, 0.16);
+        }
+
+        .fh-direction--flat {
+            color: #5a5f80;
+            background: rgba(149, 156, 201, 0.16);
+        }
+
+        .fh-bio-trend {
+            width: 100%;
+        }
+
+        .fh-sparkline {
+            width: 100%;
+            height: 70px;
+        }
+
+        .fh-bio-timeline-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .fh-timeline-chip {
+            font-size: 11px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: rgba(102, 126, 234, 0.14);
+            color: #4d568f;
+            font-weight: 600;
+        }
+
+        .fh-timeline-chip.fh-status-out-of-range { background: rgba(247, 112, 112, 0.18); color: #b23e3e; }
+        .fh-timeline-chip.fh-status-in-range { background: rgba(48, 196, 141, 0.18); color: #1e805c; }
+        .fh-timeline-chip.fh-status-improving { background: rgba(247, 178, 103, 0.18); color: #a86b2a; }
+        .fh-timeline-chip.fh-status-unknown { background: rgba(164, 168, 194, 0.18); color: #606477; }
 
         @keyframes fhOverlayFade {
             from { opacity: 0; }
             to { opacity: 1; }
         }
 
-        @media (max-width: 1024px) {
-            .fh-visual-body {
-                grid-template-columns: 1fr;
+        @media (max-width: 768px) {
+            .fh-visual-panel {
+                width: 96vw;
             }
-
-            .fh-visual-insights {
-                max-height: 220px;
-                order: -1;
+            .fh-bio-hero {
+                flex-direction: column;
+                align-items: flex-start;
             }
         }
     `;
