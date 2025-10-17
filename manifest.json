@@ -34,7 +34,8 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "final-api-extractor.js"
+        "final-api-extractor.js",
+        "visual-view/visual-view.js"
       ],
       "matches": ["https://*.functionhealth.com/*"]
     }

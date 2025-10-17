@@ -26,6 +26,7 @@ const appState = {
 // Legacy variables for compatibility during transition
 let extractedData = null;
 let filteredData = null;
+let visualViewModulePromise = null;
 
 /**
  * @description Update application state and trigger UI updates
@@ -1387,7 +1388,30 @@ function toggleHelp() {
     }
 }
 
+async function handleVisualViewClick() {
+    if (!appState.extractedData) {
+        showNotification('⚠️ Please extract data first', 'warning');
+        return;
+    }
 
+    try {
+        if (!visualViewModulePromise) {
+            showNotification('📊 Loading visual view…', 'info');
+            visualViewModulePromise = import(chrome.runtime.getURL('visual-view/visual-view.js'));
+        }
+        const module = await visualViewModulePromise;
+        const dataset = appState.filtersApplied && appState.filteredData ? appState.filteredData : appState.extractedData;
+        module.openVisualResultsView({
+            dataset,
+            filtersApplied: appState.filtersApplied,
+            latestOnly: typeof isLatestOnlyActive === 'function' ? isLatestOnlyActive() : false
+        });
+    } catch (error) {
+        console.error('Visual view module failed to load', error);
+        showNotification('❌ Unable to open visual view right now', 'error');
+        visualViewModulePromise = null;
+    }
+}
 
 
 // Initialize event listeners
@@ -1411,6 +1435,10 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('📋 Copy button clicked');
         exportData('copy');
     });
+    const visualViewBtn = document.getElementById('visualViewButton');
+    if (visualViewBtn) {
+        visualViewBtn.addEventListener('click', handleVisualViewClick);
+    }
     
     // Advanced filters toggle
     document.getElementById('advancedToggle').addEventListener('click', toggleAdvancedFilters);

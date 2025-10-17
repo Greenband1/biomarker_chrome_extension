@@ -228,6 +228,18 @@
             border-color: #218838;
         }
 
+        .advanced-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+
+        .advanced-actions .advanced-toggle {
+            flex: 1 1 160px;
+            word-break: break-word;
+        }
+
         /* Advanced Filters */
         .advanced-filters {
             max-height: 0;
@@ -680,10 +692,15 @@
                     <button id="exportCopy" class="export-button">📋 Copy</button>
                 </div>
             </div>
-            
-            <button class="advanced-toggle" id="advancedToggle">
-                🔧 Advanced Filters
-            </button>
+
+            <div class="advanced-actions">
+                <button class="advanced-toggle" id="advancedToggle">
+                    🔧 Advanced Filters
+                </button>
+                <button class="advanced-toggle" id="visualViewButton">
+                    📊 Visually View Results
+                </button>
+            </div>
         </div>
 
         <!-- Advanced Filters (expandable) -->
