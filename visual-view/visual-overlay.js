@@ -127,7 +127,7 @@ const VisualOverlay = {
         if (!this.content) return;
         if (!this.toolbar) {
             const toolbar = document.createElement('div');
-            toolbar.className = 'fh-visual-toolbar';
+            toolbar.className = 'fh-visual-toolbar fh-toolbar-inline';
 
             const categoryControl = document.createElement('div');
             categoryControl.className = 'fh-toolbar-control';
@@ -141,28 +141,23 @@ const VisualOverlay = {
             button.textContent = 'All categories';
             button.addEventListener('click', (event) => {
                 event.stopPropagation();
-                this.toggleDropdown(dataset);
+                this.toggleDropdown(dataset, button);
             });
-
-            const chipContainer = document.createElement('div');
-            chipContainer.className = 'fh-selected-chips';
 
             categoryControl.appendChild(label);
             categoryControl.appendChild(button);
             toolbar.appendChild(categoryControl);
-            toolbar.appendChild(chipContainer);
 
             this.content.innerHTML = '';
             this.content.appendChild(toolbar);
             this.toolbar = toolbar;
             this.selectButton = button;
-            this.selectedChips = chipContainer;
         }
 
         this.updateCategorySelection(dataset);
     },
 
-    toggleDropdown(dataset) {
+    toggleDropdown(dataset, anchorButton) {
         if (this.dropdownOpen) {
             this.closeDropdown();
             return;
@@ -197,7 +192,6 @@ const VisualOverlay = {
                         } else {
                             this.selectedCategories.delete(name);
                             if (this.selectedCategories.size === 0) {
-                                // Prevent empty state: default back to all
                                 categories.forEach((cat) => this.selectedCategories.add(cat));
                             }
                         }
@@ -246,7 +240,7 @@ const VisualOverlay = {
         dropdown.appendChild(actions);
         dropdown.appendChild(list);
 
-        this.toolbar.appendChild(dropdown);
+        anchorButton.parentElement.appendChild(dropdown);
         this.dropdown = dropdown;
         this.dropdownOpen = true;
         buildList();
@@ -271,30 +265,6 @@ const VisualOverlay = {
                 ? 'All categories'
                 : `${this.selectedCategories.size} selected`;
             this.selectButton.textContent = label;
-        }
-
-        if (this.selectedChips) {
-            this.selectedChips.innerHTML = '';
-            const selected = categories.filter((cat) => this.selectedCategories.has(cat));
-            selected.slice(0, 6).forEach((cat) => {
-                const chip = document.createElement('span');
-                chip.className = 'fh-chip fh-chip--ghost';
-                chip.textContent = cat;
-                chip.addEventListener('click', () => {
-                    if (this.selectedCategories.size > 1) {
-                        this.selectedCategories.delete(cat);
-                        this.updateCategorySelection(dataset);
-                        this.renderCards(dataset);
-                    }
-                });
-                this.selectedChips.appendChild(chip);
-            });
-            if (selected.length > 6) {
-                const moreChip = document.createElement('span');
-                moreChip.className = 'fh-chip fh-chip--ghost';
-                moreChip.textContent = `+${selected.length - 6} more`;
-                this.selectedChips.appendChild(moreChip);
-            }
         }
     },
 
@@ -690,6 +660,7 @@ function injectStyles() {
             display: flex;
             flex-direction: column;
             gap: 6px;
+            position: relative;
         }
 
         .fh-toolbar-control span {
@@ -708,21 +679,15 @@ function injectStyles() {
             font-size: 13px;
             color: #49538d;
             cursor: pointer;
-            min-width: 180px;
+            min-width: 200px;
             text-align: left;
-        }
-
-        .fh-selected-chips {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
         }
 
         .fh-select-dropdown {
             position: absolute;
             top: calc(100% + 8px);
             left: 0;
-            z-index: 10;
+            z-index: 20;
             width: 260px;
             background: #ffffff;
             border-radius: 12px;
