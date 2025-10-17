@@ -1413,7 +1413,7 @@ async function handleVisualViewClick() {
                 console.error('Visual view message error:', chrome.runtime.lastError.message);
                 showNotification('❌ Unable to open visual view. Try reloading the page.', 'error');
             } else {
-                showNotification('📊 Opening visual results view…', 'info', 2500);
+                setTimeout(() => window.close(), 150);
             }
         });
     } catch (error) {
