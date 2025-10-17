@@ -5,6 +5,12 @@ const STATUS_COLORS = {
     'Unknown': '#a0a4b8'
 };
 
+const BAND_COLORS = {
+    above: 'rgba(247, 112, 112, 0.09)',
+    inRange: 'rgba(48, 196, 141, 0.12)',
+    below: 'rgba(247, 178, 103, 0.09)'
+};
+
 const VisualOverlay = {
     container: null,
     content: null,
@@ -300,7 +306,13 @@ const VisualOverlay = {
 
                 category.biomarkers
                     .slice()
-                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .sort((a, b) => {
+                        const aOutOfRange = isOutOfRange(a);
+                        const bOutOfRange = isOutOfRange(b);
+                        if (aOutOfRange && !bOutOfRange) return -1;
+                        if (!aOutOfRange && bOutOfRange) return 1;
+                        return a.name.localeCompare(b.name);
+                    })
                     .forEach((biomarker) => {
                         const card = createBiomarkerCard(biomarker);
                         list.appendChild(card);
@@ -336,12 +348,82 @@ const VisualOverlay = {
     }
 };
 
-function createBiomarkerCard(biomarker) {
-    const card = document.createElement('article');
-    card.className = 'fh-bio-card';
+// ===== BIOMARKER TYPE DETECTION =====
 
+function detectBiomarkerType(biomarker) {
+    const events = buildTimelineEvents(biomarker);
+    
+    if (events.length === 0) {
+        return 'static';
+    }
+
+    if (events.length === 1) {
+        const value = String(events[0].value || '').trim();
+        if (isNonNumericValue(value)) {
+            return 'static';
+        }
+    }
+
+    const values = events.map(e => String(e.value || '').trim());
+    const numericCount = values.filter(v => isNumericValue(v)).length;
+    const categoricalCount = values.filter(v => isNonNumericValue(v)).length;
+
+    if (categoricalCount > numericCount) {
+        return 'categorical';
+    }
+
+    const hasThresholdOperator = values.some(v => /^[<>]/.test(v));
+    if (hasThresholdOperator) {
+        return 'threshold';
+    }
+
+    return 'numeric-band';
+}
+
+function isNumericValue(value) {
+    if (!value) return false;
+    const cleaned = String(value).replace(/[<>≤≥]/g, '').replace(/,/g, '').trim();
+    const parsed = parseFloat(cleaned);
+    return !Number.isNaN(parsed);
+}
+
+function isNonNumericValue(value) {
+    if (!value) return true;
+    const str = String(value).trim().toUpperCase();
+    const categorical = ['NEGATIVE', 'POSITIVE', 'NON-REACTIVE', 'REACTIVE', 'NOT DETECTED', 'DETECTED', 
+                        'CLEAR', 'YELLOW', 'NONE SEEN', 'NEG', 'NORMAL', 'ABNORMAL'];
+    return categorical.some(cat => str.includes(cat));
+}
+
+function extractNumericValue(value) {
+    if (!value) return null;
+    const str = String(value).replace(/,/g, '');
+    
+    // Handle titer format (1:320 → 320)
+    const titerMatch = str.match(/1\s*:\s*(\d+)/);
+    if (titerMatch) {
+        return parseFloat(titerMatch[1]);
+    }
+    
+    // Remove operators and parse
+    const cleaned = str.replace(/[<>≤≥]/g, '').trim();
+    const parsed = parseFloat(cleaned);
+    return Number.isNaN(parsed) ? null : parsed;
+}
+
+// ===== BIOMARKER CARD CREATION =====
+
+function createBiomarkerCard(biomarker) {
+    const events = buildTimelineEvents(biomarker);
+    const type = detectBiomarkerType(biomarker);
+    const latestEntry = events[events.length - 1] || {};
+    
+    const card = document.createElement('article');
+    card.className = `fh-bio-card fh-bio-card--${type}`;
+
+    // HEADER
     const header = document.createElement('div');
-    header.className = 'fh-bio-card-header';
+    header.className = 'fh-bio-header';
 
     const titleRow = document.createElement('div');
     titleRow.className = 'fh-bio-title-row';
@@ -349,129 +431,402 @@ function createBiomarkerCard(biomarker) {
     const name = document.createElement('h4');
     name.textContent = biomarker.name;
 
-    const latestEntry = getMostRecentEntry(biomarker);
+    const status = determineBiomarkerStatus(events);
     const badge = document.createElement('span');
-    badge.className = `fh-status-badge fh-status-${normalizeStatus(latestEntry?.status)}`;
-    badge.textContent = latestEntry?.status ?? 'Unknown';
+    badge.className = `fh-status-badge fh-status-${normalizeStatus(status)}`;
+    badge.textContent = status;
 
     titleRow.appendChild(name);
     titleRow.appendChild(badge);
+    header.appendChild(titleRow);
 
+    const refInfo = document.createElement('div');
+    refInfo.className = 'fh-reference-info';
+    refInfo.textContent = formatReferenceInfo(type, latestEntry);
+    header.appendChild(refInfo);
+
+    // HERO METRICS
     const hero = document.createElement('div');
     hero.className = 'fh-bio-hero';
 
     const valueBlock = document.createElement('div');
-    valueBlock.className = 'fh-bio-hero-block';
+    valueBlock.className = 'fh-hero-value-block';
 
-    const valueLabel = document.createElement('span');
-    valueLabel.className = 'fh-bio-hero-value';
-    valueLabel.textContent = formatValue(latestEntry?.value, latestEntry?.unit);
+    const valueEl = document.createElement('div');
+    valueEl.className = 'fh-hero-value';
+    valueEl.textContent = formatValue(latestEntry.value, latestEntry.unit);
 
-    const dateLabel = document.createElement('span');
-    dateLabel.className = 'fh-bio-hero-meta';
-    dateLabel.textContent = formatDisplayDate(latestEntry?.date);
+    const dateEl = document.createElement('div');
+    dateEl.className = 'fh-hero-date';
+    dateEl.textContent = formatDisplayDate(latestEntry.date);
 
-    valueBlock.appendChild(valueLabel);
-    valueBlock.appendChild(dateLabel);
-
+    valueBlock.appendChild(valueEl);
+    valueBlock.appendChild(dateEl);
     hero.appendChild(valueBlock);
 
-    const events = buildTimelineEvents(biomarker);
-    const direction = getDirection(events);
-    const directionBlock = document.createElement('div');
-    directionBlock.className = `fh-direction fh-direction--${direction}`;
-    directionBlock.textContent = direction === 'up' ? '▲ Rising' : direction === 'down' ? '▼ Falling' : '→ Stable';
-    hero.appendChild(directionBlock);
+    if (events.length > 1) {
+        const direction = getDirectionBadge(events);
+        if (direction) {
+            hero.appendChild(direction);
+        }
+    }
 
-    header.appendChild(titleRow);
     header.appendChild(hero);
     card.appendChild(header);
 
-    const trend = document.createElement('div');
-    trend.className = 'fh-bio-trend';
-    const sparkline = createSparkline(events);
-    trend.appendChild(sparkline);
-    card.appendChild(trend);
+    // VISUALIZATION
+    if (type === 'numeric-band' && events.length > 1) {
+        const chart = createBandChart(events);
+        card.appendChild(chart);
+    } else if (type === 'threshold' && events.length > 1) {
+        const chart = createThresholdChart(events);
+        card.appendChild(chart);
+    } else if (type === 'categorical') {
+        const timeline = createCategoricalTimeline(events);
+        card.appendChild(timeline);
+    } else if (type === 'static') {
+        // No chart for static single-value tests
+    } else {
+        // Fallback simple sparkline
+        const chart = createSimpleSparkline(events);
+        card.appendChild(chart);
+    }
 
-    const timeline = document.createElement('div');
-    timeline.className = 'fh-bio-timeline-chips';
-    events.slice().reverse().forEach((event) => {
-        const chip = document.createElement('span');
-        chip.className = `fh-timeline-chip fh-status-${normalizeStatus(event.status)}`;
-        chip.textContent = `${formatDisplayDate(event.date)} • ${formatValue(event.value, event.unit)}`;
-        timeline.appendChild(chip);
-    });
-    card.appendChild(timeline);
+    // FOOTER (history chips)
+    if (events.length > 1 || type === 'categorical') {
+        const footer = createHistoryFooter(events, type);
+        card.appendChild(footer);
+    }
 
     return card;
 }
 
-function createSparkline(events) {
-    const numericEvents = events
-        .map((event) => ({
-            date: event.date,
-            status: event.status,
-            rawValue: event.value,
-            unit: event.unit,
-            value: parseFloat(String(event.value).replace(/[^0-9.\-]/g, ''))
-        }))
-        .filter((event) => !Number.isNaN(event.value));
+// ===== CHART RENDERERS =====
 
-    const width = 220;
-    const height = 60;
+function createBandChart(events) {
+    const container = document.createElement('div');
+    container.className = 'fh-chart-container';
+
+    const width = 600;
+    const height = 200;
+    const padding = { top: 20, right: 40, bottom: 40, left: 80 };
+
+    const numericEvents = events
+        .map(e => ({ ...e, numericValue: extractNumericValue(e.value) }))
+        .filter(e => e.numericValue !== null);
+
+    if (numericEvents.length === 0) {
+        container.textContent = 'Unable to parse numeric values';
+        return container;
+    }
+
+    const values = numericEvents.map(e => e.numericValue);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min || 1;
+    
+    // Estimate reference bands (simplified - in production, parse from API)
+    const bandLow = min - range * 0.2;
+    const bandHigh = max + range * 0.2;
+    const chartMin = bandLow;
+    const chartMax = bandHigh;
+    const chartRange = chartMax - chartMin;
 
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
-    svg.setAttribute('preserveAspectRatio', 'none');
-    svg.classList.add('fh-sparkline');
+    svg.classList.add('fh-band-chart');
 
-    if (numericEvents.length < 2) {
-        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        line.setAttribute('x1', 0);
-        line.setAttribute('y1', height / 2);
-        line.setAttribute('x2', width);
-        line.setAttribute('y2', height / 2);
-        line.setAttribute('stroke', '#d5d8f4');
-        line.setAttribute('stroke-width', '2');
-        svg.appendChild(line);
-        return svg;
-    }
+    // Draw bands
+    const bandHeight = (height - padding.top - padding.bottom) / 3;
+    
+    // Above range band (top)
+    const aboveRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    aboveRect.setAttribute('x', padding.left);
+    aboveRect.setAttribute('y', padding.top);
+    aboveRect.setAttribute('width', width - padding.left - padding.right);
+    aboveRect.setAttribute('height', bandHeight);
+    aboveRect.setAttribute('fill', BAND_COLORS.above);
+    svg.appendChild(aboveRect);
 
-    const minValue = Math.min(...numericEvents.map((event) => event.value));
-    const maxValue = Math.max(...numericEvents.map((event) => event.value));
-    const range = maxValue - minValue || 1;
+    // In range band (middle)
+    const inRangeRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    inRangeRect.setAttribute('x', padding.left);
+    inRangeRect.setAttribute('y', padding.top + bandHeight);
+    inRangeRect.setAttribute('width', width - padding.left - padding.right);
+    inRangeRect.setAttribute('height', bandHeight);
+    inRangeRect.setAttribute('fill', BAND_COLORS.inRange);
+    svg.appendChild(inRangeRect);
 
+    // Below range band (bottom)
+    const belowRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    belowRect.setAttribute('x', padding.left);
+    belowRect.setAttribute('y', padding.top + 2 * bandHeight);
+    belowRect.setAttribute('width', width - padding.left - padding.right);
+    belowRect.setAttribute('height', bandHeight);
+    belowRect.setAttribute('fill', BAND_COLORS.below);
+    svg.appendChild(belowRect);
+
+    // Band labels
+    const aboveLabel = createSVGText('Above Range', padding.left - 5, padding.top + bandHeight / 2, 'end', 10, '#8e5b5b');
+    const inRangeLabel = createSVGText('In Range', padding.left - 5, padding.top + 1.5 * bandHeight, 'end', 10, '#2a7d5f');
+    const belowLabel = createSVGText('Below Range', padding.left - 5, padding.top + 2.5 * bandHeight, 'end', 10, '#9d7030');
+    
+    svg.appendChild(aboveLabel);
+    svg.appendChild(inRangeLabel);
+    svg.appendChild(belowLabel);
+
+    // Plot points and line
+    const chartWidth = width - padding.left - padding.right;
+    const chartHeight = height - padding.top - padding.bottom;
+    
     const points = numericEvents.map((event, index) => {
-        const x = (width / (numericEvents.length - 1)) * index;
-        const y = height - ((event.value - minValue) / range) * height;
+        const x = padding.left + (chartWidth / (numericEvents.length - 1 || 1)) * index;
+        const y = padding.top + chartHeight - ((event.numericValue - chartMin) / chartRange) * chartHeight;
         return { x, y, event };
     });
 
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    const pathData = points
-        .map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x.toFixed(2)},${point.y.toFixed(2)}`)
-        .join(' ');
-    path.setAttribute('d', pathData);
-    path.setAttribute('fill', 'none');
-    path.setAttribute('stroke', '#6471f5');
-    path.setAttribute('stroke-width', '2.2');
-    path.setAttribute('stroke-linecap', 'round');
-    svg.appendChild(path);
+    // Trend line
+    if (points.length > 1) {
+        const pathData = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ');
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', pathData);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', '#4a5fc1');
+        path.setAttribute('stroke-width', '2.5');
+        path.setAttribute('stroke-linecap', 'round');
+        path.setAttribute('stroke-linejoin', 'round');
+        svg.appendChild(path);
+    }
+
+    // Data points
+    points.forEach((point, index) => {
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', point.x);
+        circle.setAttribute('cy', point.y);
+        circle.setAttribute('r', 7);
+        circle.setAttribute('fill', STATUS_COLORS[point.event.status] || STATUS_COLORS.Unknown);
+        circle.setAttribute('stroke', '#ffffff');
+        circle.setAttribute('stroke-width', '2');
+        
+        const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        title.textContent = `${formatDisplayDate(point.event.date)}\n${formatValue(point.event.value, point.event.unit)}\n${point.event.status}`;
+        circle.appendChild(title);
+        
+        svg.appendChild(circle);
+
+        // Value label above point
+        const valueLabel = createSVGText(
+            String(point.event.numericValue),
+            point.x,
+            point.y - 12,
+            'middle',
+            11,
+            '#2d334c'
+        );
+        valueLabel.setAttribute('font-weight', '600');
+        svg.appendChild(valueLabel);
+
+        // Date label below
+        const dateLabel = createSVGText(
+            formatShortDate(point.event.date),
+            point.x,
+            height - padding.bottom + 20,
+            'middle',
+            10,
+            '#6c748c'
+        );
+        svg.appendChild(dateLabel);
+    });
+
+    container.appendChild(svg);
+    return container;
+}
+
+function createThresholdChart(events) {
+    const container = document.createElement('div');
+    container.className = 'fh-chart-container fh-chart-threshold';
+
+    const width = 600;
+    const height = 120;
+    const padding = { top: 20, right: 40, bottom: 30, left: 80 };
+
+    const numericEvents = events
+        .map(e => ({ ...e, numericValue: extractNumericValue(e.value) }))
+        .filter(e => e.numericValue !== null);
+
+    if (numericEvents.length === 0) {
+        container.textContent = 'Unable to parse values';
+        return container;
+    }
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    svg.classList.add('fh-threshold-chart');
+
+    const chartWidth = width - padding.left - padding.right;
+    const chartHeight = height - padding.top - padding.bottom;
+    const midY = padding.top + chartHeight / 2;
+
+    // Threshold line
+    const thresholdLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    thresholdLine.setAttribute('x1', padding.left);
+    thresholdLine.setAttribute('y1', midY);
+    thresholdLine.setAttribute('x2', width - padding.right);
+    thresholdLine.setAttribute('y2', midY);
+    thresholdLine.setAttribute('stroke', '#8892b0');
+    thresholdLine.setAttribute('stroke-width', '1.5');
+    thresholdLine.setAttribute('stroke-dasharray', '4,4');
+    svg.appendChild(thresholdLine);
+
+    // Plot points along timeline
+    numericEvents.forEach((event, index) => {
+        const x = padding.left + (chartWidth / (numericEvents.length - 1 || 1)) * index;
+        
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', x);
+        circle.setAttribute('cy', midY);
+        circle.setAttribute('r', 7);
+        circle.setAttribute('fill', STATUS_COLORS[event.status] || STATUS_COLORS.Unknown);
+        circle.setAttribute('stroke', '#ffffff');
+        circle.setAttribute('stroke-width', '2');
+        
+        const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        title.textContent = `${formatDisplayDate(event.date)}\n${event.value} ${event.unit || ''}\n${event.status}`;
+        circle.appendChild(title);
+        svg.appendChild(circle);
+
+        // Date label
+        const dateLabel = createSVGText(
+            formatShortDate(event.date),
+            x,
+            height - padding.bottom + 20,
+            'middle',
+            10,
+            '#6c748c'
+        );
+        svg.appendChild(dateLabel);
+    });
+
+    container.appendChild(svg);
+    return container;
+}
+
+function createCategoricalTimeline(events) {
+    const container = document.createElement('div');
+    container.className = 'fh-categorical-timeline';
+
+    events.slice().reverse().forEach((event, index) => {
+        const chip = document.createElement('div');
+        chip.className = `fh-cat-chip fh-status-${normalizeStatus(event.status)}`;
+        
+        const icon = document.createElement('span');
+        icon.className = 'fh-cat-icon';
+        icon.textContent = getCategoricalIcon(event.value, event.status);
+        
+        const text = document.createElement('span');
+        text.textContent = `${formatShortDate(event.date)} • ${event.value}`;
+        
+        chip.appendChild(icon);
+        chip.appendChild(text);
+        container.appendChild(chip);
+    });
+
+    return container;
+}
+
+function createSimpleSparkline(events) {
+    const container = document.createElement('div');
+    container.className = 'fh-chart-container';
+
+    const width = 400;
+    const height = 80;
+
+    const numericEvents = events
+        .map(e => ({ ...e, numericValue: extractNumericValue(e.value) }))
+        .filter(e => e.numericValue !== null);
+
+    if (numericEvents.length === 0) {
+        return container;
+    }
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    svg.classList.add('fh-simple-sparkline');
+
+    const values = numericEvents.map(e => e.numericValue);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min || 1;
+
+    const points = numericEvents.map((event, index) => {
+        const x = (width / (numericEvents.length - 1 || 1)) * index;
+        const y = height - ((event.numericValue - min) / range) * height;
+        return { x, y, event };
+    });
+
+    if (points.length > 1) {
+        const pathData = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ');
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', pathData);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', '#6471f5');
+        path.setAttribute('stroke-width', '2');
+        svg.appendChild(path);
+    }
 
     points.forEach((point) => {
         const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         circle.setAttribute('cx', point.x);
         circle.setAttribute('cy', point.y);
-        circle.setAttribute('r', 4.2);
+        circle.setAttribute('r', 5);
         circle.setAttribute('fill', STATUS_COLORS[point.event.status] || STATUS_COLORS.Unknown);
         circle.setAttribute('stroke', '#ffffff');
         circle.setAttribute('stroke-width', '1.5');
-        circle.setAttribute('data-tooltip', `${formatDisplayDate(point.event.date)} • ${formatValue(point.event.rawValue, point.event.unit)} (${point.event.status})`);
         svg.appendChild(circle);
     });
 
-    return svg;
+    container.appendChild(svg);
+    return container;
 }
+
+function createHistoryFooter(events, type) {
+    const footer = document.createElement('div');
+    footer.className = 'fh-bio-footer';
+
+    const chips = document.createElement('div');
+    chips.className = 'fh-history-chips';
+
+    const maxChips = 5;
+    const recentEvents = events.slice().reverse().slice(0, maxChips);
+
+    recentEvents.forEach((event) => {
+        const chip = document.createElement('span');
+        chip.className = `fh-history-chip fh-status-${normalizeStatus(event.status)}`;
+        chip.textContent = `${formatShortDate(event.date)} • ${formatValue(event.value, event.unit)}`;
+        chips.appendChild(chip);
+    });
+
+    if (events.length > maxChips) {
+        const moreChip = document.createElement('span');
+        moreChip.className = 'fh-history-chip fh-history-chip--more';
+        moreChip.textContent = `+${events.length - maxChips} more`;
+        chips.appendChild(moreChip);
+    }
+
+    footer.appendChild(chips);
+
+    const insight = getTrendInsight(events);
+    if (insight) {
+        const insightBadge = document.createElement('div');
+        insightBadge.className = `fh-trend-insight fh-trend-insight--${insight.type}`;
+        insightBadge.textContent = insight.text;
+        footer.appendChild(insightBadge);
+    }
+
+    return footer;
+}
+
+// ===== HELPER FUNCTIONS =====
 
 function buildTimelineEvents(biomarker) {
     const entries = [];
@@ -501,21 +856,129 @@ function buildTimelineEvents(biomarker) {
         .sort((a, b) => new Date(a.date) - new Date(b.date));
 }
 
-function getMostRecentEntry(biomarker) {
-    const events = buildTimelineEvents(biomarker);
-    return events[events.length - 1];
+function determineBiomarkerStatus(events) {
+    if (events.length === 0) return 'Unknown';
+    
+    const latest = events[events.length - 1];
+    
+    // Check for improving status
+    if (events.length >= 2) {
+        const previous = events[events.length - 2];
+        if (previous.status === 'Out of Range' && latest.status === 'In Range') {
+            return 'Improving';
+        }
+    }
+    
+    return latest.status || 'Unknown';
 }
 
-function getDirection(events) {
+function getDirectionBadge(events) {
     const numericEvents = events
-        .map((event) => parseFloat(String(event.value).replace(/[^0-9.\-]/g, '')))
-        .filter((value) => !Number.isNaN(value));
-    if (numericEvents.length < 2) return 'flat';
-    const last = numericEvents[numericEvents.length - 1];
-    const prev = numericEvents[numericEvents.length - 2];
-    if (last > prev) return 'up';
-    if (last < prev) return 'down';
-    return 'flat';
+        .map(e => ({ ...e, numericValue: extractNumericValue(e.value) }))
+        .filter(e => e.numericValue !== null);
+    
+    if (numericEvents.length < 2) return null;
+    
+    const latest = numericEvents[numericEvents.length - 1].numericValue;
+    const previous = numericEvents[numericEvents.length - 2].numericValue;
+    const percentChange = ((latest - previous) / previous) * 100;
+    
+    const badge = document.createElement('div');
+    
+    if (Math.abs(percentChange) < 5) {
+        badge.className = 'fh-direction fh-direction--flat';
+        badge.textContent = '→ Stable';
+    } else if (latest > previous) {
+        badge.className = 'fh-direction fh-direction--up';
+        badge.textContent = `▲ +${Math.abs(percentChange).toFixed(1)}%`;
+    } else {
+        badge.className = 'fh-direction fh-direction--down';
+        badge.textContent = `▼ -${Math.abs(percentChange).toFixed(1)}%`;
+    }
+    
+    return badge;
+}
+
+function getTrendInsight(events) {
+    if (events.length < 2) return null;
+    
+    const latest = events[events.length - 1];
+    const previous = events[events.length - 2];
+    
+    // Improving
+    if (previous.status === 'Out of Range' && latest.status === 'In Range') {
+        return {
+            type: 'improving',
+            text: `↗ Back in range as of ${formatShortDate(latest.date)}`
+        };
+    }
+    
+    // Recently out of range
+    if (previous.status === 'In Range' && latest.status === 'Out of Range') {
+        return {
+            type: 'warning',
+            text: `⚠ Moved out of range on ${formatShortDate(latest.date)}`
+        };
+    }
+    
+    // Stable in range
+    const allInRange = events.slice(-3).every(e => e.status === 'In Range');
+    if (allInRange && events.length >= 3) {
+        return {
+            type: 'stable',
+            text: `✓ Stable across ${events.length} tests`
+        };
+    }
+    
+    return null;
+}
+
+function formatReferenceInfo(type, latestEntry) {
+    const unit = latestEntry.unit || '';
+    
+    switch (type) {
+        case 'categorical':
+            return `Expected: ${getCategoricalExpected(latestEntry.value)}`;
+        case 'threshold':
+            if (String(latestEntry.value || '').includes('<')) {
+                return `Target: below threshold ${unit}`.trim();
+            } else if (String(latestEntry.value || '').includes('>')) {
+                return `Target: above threshold ${unit}`.trim();
+            }
+            return `Threshold-based ${unit}`.trim();
+        case 'static':
+            return 'Informational value';
+        default:
+            return unit ? `Reference range not available • ${unit}` : 'Reference range not available';
+    }
+}
+
+function getCategoricalExpected(value) {
+    const str = String(value || '').toUpperCase();
+    if (str.includes('NOT DETECTED') || str.includes('NEGATIVE') || str.includes('NON-REACTIVE')) {
+        return 'NEGATIVE / NOT DETECTED';
+    }
+    if (str.includes('CLEAR')) return 'CLEAR';
+    if (str.includes('NONE SEEN')) return 'NONE SEEN';
+    return value;
+}
+
+function getCategoricalIcon(value, status) {
+    const str = String(value || '').toUpperCase();
+    if (status === 'Out of Range') return '⚠';
+    if (str.includes('NOT DETECTED') || str.includes('NEGATIVE') || str.includes('NON-REACTIVE') || str.includes('NONE SEEN')) {
+        return '✓';
+    }
+    if (str.includes('POSITIVE') || str.includes('DETECTED')) {
+        return '⚠';
+    }
+    return 'ℹ';
+}
+
+function isOutOfRange(biomarker) {
+    const events = buildTimelineEvents(biomarker);
+    if (events.length === 0) return false;
+    return events[events.length - 1].status === 'Out of Range';
 }
 
 function normalizeStatus(status) {
@@ -541,6 +1004,29 @@ function formatDisplayDate(dateString) {
     });
 }
 
+function formatShortDate(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) {
+        return dateString;
+    }
+    return date.toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric'
+    });
+}
+
+function createSVGText(text, x, y, anchor, size, color) {
+    const textEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    textEl.setAttribute('x', x);
+    textEl.setAttribute('y', y);
+    textEl.setAttribute('text-anchor', anchor);
+    textEl.setAttribute('font-size', size);
+    textEl.setAttribute('fill', color);
+    textEl.textContent = text;
+    return textEl;
+}
+
 function injectStyles() {
     if (document.getElementById('fh-visual-styles')) return;
     const style = document.createElement('style');
@@ -553,43 +1039,43 @@ function injectStyles() {
         .fh-visual-overlay {
             position: fixed;
             inset: 0;
-            background: rgba(20, 24, 33, 0.72);
-            backdrop-filter: blur(8px);
+            background: rgba(20, 24, 33, 0.75);
+            backdrop-filter: blur(10px);
             z-index: 2147483646;
             display: none;
             align-items: center;
             justify-content: center;
-            padding: clamp(12px, 4vw, 28px);
+            padding: clamp(12px, 3vw, 24px);
         }
 
         .fh-visual-overlay--open {
             display: flex;
-            animation: fhOverlayFade 0.2s ease;
+            animation: fhOverlayFade 0.25s ease-out;
         }
 
         .fh-visual-panel {
-            width: min(1100px, 96vw);
-            max-height: 92vh;
+            width: min(1400px, 98vw);
+            max-height: 94vh;
             background: #f6f7fb;
             border-radius: 20px;
-            box-shadow: 0 30px 60px rgba(15, 23, 42, 0.35);
+            box-shadow: 0 30px 70px rgba(15, 23, 42, 0.4);
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            border: 1px solid rgba(102, 126, 234, 0.2);
+            border: 1px solid rgba(102, 126, 234, 0.25);
         }
 
         .fh-visual-header {
             display: flex;
             align-items: center;
-            padding: 20px 24px;
-            background: linear-gradient(135deg, rgba(102, 126, 234, 0.16), rgba(118, 75, 162, 0.12));
-            border-bottom: 1px solid rgba(102, 126, 234, 0.25);
+            padding: 22px 28px;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.18), rgba(118, 75, 162, 0.14));
+            border-bottom: 1px solid rgba(102, 126, 234, 0.28);
         }
 
         .fh-visual-header h2 {
             margin: 0;
-            font-size: 22px;
+            font-size: 24px;
             color: #1f2a44;
             font-weight: 700;
         }
@@ -602,9 +1088,9 @@ function injectStyles() {
         }
 
         .fh-chip {
-            background: rgba(102, 126, 234, 0.18);
+            background: rgba(102, 126, 234, 0.2);
             color: #4a55a2;
-            padding: 6px 12px;
+            padding: 7px 14px;
             border-radius: 999px;
             font-size: 12px;
             font-weight: 600;
@@ -615,95 +1101,113 @@ function injectStyles() {
             background: rgba(102, 126, 234, 0.12);
             color: #4a55a2;
             cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .fh-chip--ghost:hover {
+            background: rgba(102, 126, 234, 0.22);
         }
 
         .fh-visual-close {
-            margin-left: 16px;
-            width: 42px;
-            height: 42px;
+            margin-left: 18px;
+            width: 44px;
+            height: 44px;
             border-radius: 50%;
             border: none;
-            background: rgba(255, 255, 255, 0.78);
+            background: rgba(255, 255, 255, 0.85);
             color: #4a55a2;
-            font-size: 26px;
+            font-size: 28px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: background 0.2s ease;
+            transition: all 0.2s ease;
         }
 
         .fh-visual-close:hover {
             background: #ffffff;
+            transform: scale(1.05);
         }
 
         .fh-visual-body {
             overflow: hidden auto;
-            padding: 0 24px 24px;
+            padding: 0 28px 28px;
         }
 
         .fh-visual-content {
             display: flex;
             flex-direction: column;
-            gap: 18px;
+            gap: 20px;
         }
 
         .fh-visual-toolbar {
             display: flex;
             flex-wrap: wrap;
             gap: 16px;
-            align-items: center;
-            padding-top: 18px;
+            align-items: flex-end;
+            padding-top: 20px;
+            padding-bottom: 8px;
         }
 
         .fh-toolbar-control {
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: 7px;
             position: relative;
         }
 
         .fh-toolbar-control span {
-            font-size: 12px;
-            font-weight: 600;
+            font-size: 11px;
+            font-weight: 700;
             color: #53618c;
             text-transform: uppercase;
-            letter-spacing: 0.08em;
+            letter-spacing: 0.1em;
         }
 
         .fh-select-button {
-            border: 1px solid rgba(102, 126, 234, 0.3);
-            background: rgba(255, 255, 255, 0.92);
-            padding: 8px 14px;
+            border: 1px solid rgba(102, 126, 234, 0.35);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 10px 16px;
             border-radius: 10px;
-            font-size: 13px;
+            font-size: 14px;
             color: #49538d;
             cursor: pointer;
             min-width: 200px;
             text-align: left;
+            transition: all 0.2s ease;
+        }
+
+        .fh-select-button:hover {
+            background: #ffffff;
+            border-color: rgba(102, 126, 234, 0.5);
         }
 
         .fh-select-dropdown {
             position: absolute;
-            top: calc(100% + 8px);
+            top: calc(100% + 10px);
             left: 0;
-            z-index: 20;
-            width: 260px;
+            z-index: 30;
+            width: 280px;
             background: #ffffff;
-            border-radius: 12px;
-            box-shadow: 0 20px 40px rgba(51, 57, 100, 0.18);
-            border: 1px solid rgba(102, 126, 234, 0.18);
-            padding: 12px;
+            border-radius: 14px;
+            box-shadow: 0 24px 48px rgba(51, 57, 100, 0.22);
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            padding: 14px;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 12px;
         }
 
         .fh-select-search {
-            padding: 8px 10px;
-            border-radius: 8px;
-            border: 1px solid rgba(102, 126, 234, 0.28);
+            padding: 9px 12px;
+            border-radius: 9px;
+            border: 1px solid rgba(102, 126, 234, 0.3);
             font-size: 13px;
+            outline: none;
+        }
+
+        .fh-select-search:focus {
+            border-color: rgba(102, 126, 234, 0.5);
         }
 
         .fh-select-actions {
@@ -713,69 +1217,98 @@ function injectStyles() {
 
         .fh-select-actions button {
             flex: 1;
-            padding: 6px 8px;
+            padding: 7px 10px;
             border-radius: 8px;
-            border: 1px solid rgba(102, 126, 234, 0.25);
-            background: rgba(102, 126, 234, 0.1);
+            border: 1px solid rgba(102, 126, 234, 0.28);
+            background: rgba(102, 126, 234, 0.12);
             color: #515a94;
             font-size: 12px;
             cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .fh-select-actions button:hover {
+            background: rgba(102, 126, 234, 0.2);
         }
 
         .fh-select-list {
-            max-height: 200px;
+            max-height: 220px;
             overflow-y: auto;
             display: grid;
-            gap: 6px;
+            gap: 7px;
         }
 
         .fh-select-item {
             display: flex;
-            gap: 8px;
+            gap: 10px;
             align-items: center;
             font-size: 13px;
             color: #414674;
+            cursor: pointer;
+            padding: 4px 6px;
+            border-radius: 6px;
+            transition: background 0.2s ease;
+        }
+
+        .fh-select-item:hover {
+            background: rgba(102, 126, 234, 0.08);
         }
 
         .fh-select-item input {
             accent-color: #667eea;
+            cursor: pointer;
         }
 
         .fh-bio-grid {
             display: grid;
-            gap: 16px;
+            gap: 18px;
+            grid-template-columns: repeat(auto-fill, minmax(520px, 1fr));
         }
 
         .fh-category-header {
+            grid-column: 1 / -1;
             display: flex;
             align-items: baseline;
             justify-content: space-between;
-            margin-top: 16px;
-            padding: 4px 2px;
+            margin-top: 20px;
+            padding: 8px 4px 6px;
+            border-bottom: 2px solid rgba(102, 126, 234, 0.2);
         }
 
         .fh-category-header h3 {
             margin: 0;
-            font-size: 17px;
+            font-size: 19px;
             color: #27304d;
+            font-weight: 700;
         }
 
         .fh-category-header span {
-            font-size: 12px;
+            font-size: 13px;
             color: #6d7391;
+            font-weight: 600;
         }
 
         .fh-bio-card {
             border-radius: 16px;
-            background: linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(246, 247, 251, 0.96));
-            padding: 16px 18px;
-            box-shadow: 0 16px 40px rgba(48, 55, 99, 0.12);
-            border: 1px solid rgba(102, 126, 234, 0.12);
+            background: linear-gradient(145deg, #ffffff, rgba(246, 247, 251, 0.98));
+            padding: 18px 20px 20px;
+            box-shadow: 0 16px 40px rgba(48, 55, 99, 0.13);
+            border: 1px solid rgba(102, 126, 234, 0.14);
             display: grid;
-            gap: 14px;
+            gap: 16px;
+            transition: all 0.25s ease;
         }
 
-        .fh-bio-card-header {
+        .fh-bio-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 20px 50px rgba(48, 55, 99, 0.18);
+        }
+
+        .fh-bio-card--static {
+            min-height: 140px;
+        }
+
+        .fh-bio-header {
             display: grid;
             gap: 10px;
         }
@@ -784,23 +1317,26 @@ function injectStyles() {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 12px;
+            gap: 14px;
         }
 
-        .fh-bio-card-header h4 {
+        .fh-bio-header h4 {
             margin: 0;
             font-size: 17px;
             color: #2e3658;
+            font-weight: 700;
+            line-height: 1.3;
         }
 
         .fh-status-badge {
-            padding: 5px 12px;
+            padding: 6px 13px;
             border-radius: 999px;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 700;
             color: #ffffff;
             text-transform: uppercase;
-            letter-spacing: 0.03em;
+            letter-spacing: 0.04em;
+            white-space: nowrap;
         }
 
         .fh-status-in-range { background: #30c48d; }
@@ -808,88 +1344,199 @@ function injectStyles() {
         .fh-status-improving { background: #f7b267; }
         .fh-status-unknown { background: #94a0be; }
 
+        .fh-reference-info {
+            font-size: 12px;
+            color: #6a7395;
+            font-weight: 500;
+            font-style: italic;
+        }
+
         .fh-bio-hero {
             display: flex;
             align-items: center;
-            gap: 14px;
+            gap: 16px;
             flex-wrap: wrap;
+            padding-top: 4px;
         }
 
-        .fh-bio-hero-block {
+        .fh-hero-value-block {
             display: grid;
             gap: 4px;
         }
 
-        .fh-bio-hero-value {
-            font-size: 24px;
+        .fh-hero-value {
+            font-size: 26px;
             font-weight: 700;
             color: #243057;
+            line-height: 1.1;
         }
 
-        .fh-bio-hero-meta {
+        .fh-hero-date {
             font-size: 13px;
             color: #6a7395;
+            font-weight: 500;
         }
 
         .fh-direction {
             font-size: 13px;
-            font-weight: 600;
-            padding: 6px 10px;
+            font-weight: 700;
+            padding: 7px 12px;
             border-radius: 10px;
+            letter-spacing: 0.02em;
         }
 
         .fh-direction--up {
             color: #1c8f63;
-            background: rgba(48, 196, 141, 0.16);
+            background: rgba(48, 196, 141, 0.18);
         }
 
         .fh-direction--down {
             color: #d45b5b;
-            background: rgba(247, 112, 112, 0.16);
+            background: rgba(247, 112, 112, 0.18);
         }
 
         .fh-direction--flat {
             color: #5a5f80;
-            background: rgba(149, 156, 201, 0.16);
+            background: rgba(149, 156, 201, 0.18);
         }
 
-        .fh-bio-trend {
+        .fh-chart-container {
             width: 100%;
+            margin: 6px 0;
         }
 
-        .fh-sparkline {
+        .fh-band-chart,
+        .fh-threshold-chart,
+        .fh-simple-sparkline {
             width: 100%;
-            height: 70px;
+            height: auto;
         }
 
-        .fh-bio-timeline-chips {
+        .fh-categorical-timeline {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 12px 0;
+        }
+
+        .fh-cat-chip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 600;
+            border: 1px solid;
+        }
+
+        .fh-cat-chip.fh-status-in-range {
+            background: rgba(48, 196, 141, 0.14);
+            color: #1e805c;
+            border-color: rgba(48, 196, 141, 0.3);
+        }
+
+        .fh-cat-chip.fh-status-out-of-range {
+            background: rgba(247, 112, 112, 0.14);
+            color: #b23e3e;
+            border-color: rgba(247, 112, 112, 0.3);
+        }
+
+        .fh-cat-icon {
+            font-size: 16px;
+        }
+
+        .fh-bio-footer {
+            display: grid;
+            gap: 12px;
+            padding-top: 6px;
+        }
+
+        .fh-history-chips {
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
         }
 
-        .fh-timeline-chip {
+        .fh-history-chip {
             font-size: 11px;
-            padding: 6px 10px;
+            padding: 6px 11px;
             border-radius: 999px;
-            background: rgba(102, 126, 234, 0.14);
-            color: #4d568f;
             font-weight: 600;
+            letter-spacing: 0.01em;
         }
 
-        .fh-timeline-chip.fh-status-out-of-range { background: rgba(247, 112, 112, 0.18); color: #b23e3e; }
-        .fh-timeline-chip.fh-status-in-range { background: rgba(48, 196, 141, 0.18); color: #1e805c; }
-        .fh-timeline-chip.fh-status-improving { background: rgba(247, 178, 103, 0.18); color: #a86b2a; }
-        .fh-timeline-chip.fh-status-unknown { background: rgba(164, 168, 194, 0.18); color: #606477; }
+        .fh-history-chip.fh-status-in-range {
+            background: rgba(48, 196, 141, 0.16);
+            color: #1e805c;
+        }
+
+        .fh-history-chip.fh-status-out-of-range {
+            background: rgba(247, 112, 112, 0.16);
+            color: #b23e3e;
+        }
+
+        .fh-history-chip.fh-status-improving {
+            background: rgba(247, 178, 103, 0.16);
+            color: #a86b2a;
+        }
+
+        .fh-history-chip.fh-status-unknown {
+            background: rgba(164, 168, 194, 0.16);
+            color: #606477;
+        }
+
+        .fh-history-chip--more {
+            background: rgba(102, 126, 234, 0.12);
+            color: #555f9a;
+        }
+
+        .fh-trend-insight {
+            font-size: 12px;
+            font-weight: 600;
+            padding: 8px 12px;
+            border-radius: 10px;
+            display: inline-block;
+        }
+
+        .fh-trend-insight--improving {
+            background: rgba(247, 178, 103, 0.18);
+            color: #a86b2a;
+        }
+
+        .fh-trend-insight--warning {
+            background: rgba(247, 112, 112, 0.18);
+            color: #b23e3e;
+        }
+
+        .fh-trend-insight--stable {
+            background: rgba(48, 196, 141, 0.16);
+            color: #1e805c;
+        }
 
         @keyframes fhOverlayFade {
-            from { opacity: 0; }
-            to { opacity: 1; }
+            from {
+                opacity: 0;
+                transform: scale(0.96);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .fh-bio-grid {
+                grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+            }
         }
 
         @media (max-width: 768px) {
             .fh-visual-panel {
                 width: 96vw;
+            }
+            .fh-bio-grid {
+                grid-template-columns: 1fr;
             }
             .fh-bio-hero {
                 flex-direction: column;
