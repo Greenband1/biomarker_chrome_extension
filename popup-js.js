@@ -26,7 +26,6 @@ const appState = {
 // Legacy variables for compatibility during transition
 let extractedData = null;
 let filteredData = null;
-let visualViewModulePromise = null;
 
 /**
  * @description Update application state and trigger UI updates
@@ -1395,21 +1394,31 @@ async function handleVisualViewClick() {
     }
 
     try {
-        if (!visualViewModulePromise) {
-            showNotification('📊 Loading visual view…', 'info');
-            visualViewModulePromise = import(chrome.runtime.getURL('visual-view/visual-view.js'));
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (!tab || !tab.id) {
+            showNotification('❌ Unable to detect active tab for visual view', 'error');
+            return;
         }
-        const module = await visualViewModulePromise;
+
         const dataset = appState.filtersApplied && appState.filteredData ? appState.filteredData : appState.extractedData;
-        module.openVisualResultsView({
-            dataset,
-            filtersApplied: appState.filtersApplied,
-            latestOnly: typeof isLatestOnlyActive === 'function' ? isLatestOnlyActive() : false
+        chrome.tabs.sendMessage(tab.id, {
+            action: 'fhOpenVisualView',
+            payload: {
+                dataset,
+                filtersApplied: appState.filtersApplied,
+                latestOnly: typeof isLatestOnlyActive === 'function' ? isLatestOnlyActive() : false
+            }
+        }, () => {
+            if (chrome.runtime.lastError) {
+                console.error('Visual view message error:', chrome.runtime.lastError.message);
+                showNotification('❌ Unable to open visual view. Try reloading the page.', 'error');
+            } else {
+                showNotification('📊 Opening visual results view…', 'info', 2500);
+            }
         });
     } catch (error) {
-        console.error('Visual view module failed to load', error);
+        console.error('Visual view request failed:', error);
         showNotification('❌ Unable to open visual view right now', 'error');
-        visualViewModulePromise = null;
     }
 }
 

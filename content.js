@@ -440,6 +440,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             }
             return true; // Will respond asynchronously
         
+        case 'fhOpenVisualView':
+            ensureVisualOverlayModule()
+                .then(() => {
+                    if (window.FHVisualOverlay && typeof window.FHVisualOverlay.open === 'function') {
+                        window.FHVisualOverlay.open(request.payload);
+                        sendResponse({ success: true });
+                    } else {
+                        sendResponse({ success: false, error: 'Visual overlay unavailable' });
+                    }
+                })
+                .catch(error => {
+                    console.error('Failed to load visual overlay', error);
+                    sendResponse({ success: false, error: error.message });
+                });
+            return true; // async response
+        
         default:
             sendResponse({ success: false, error: 'Unknown action' });
     }
@@ -447,4 +463,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true; // Keep the message channel open for async response
 });
 
+
+
 console.log('Function Health content script loaded and ready');
+
+let visualOverlayModulePromise = null;
+
+function ensureVisualOverlayModule() {
+    if (!visualOverlayModulePromise) {
+        visualOverlayModulePromise = import(chrome.runtime.getURL('visual-view/visual-overlay.js'))
+            .then((module) => {
+                if (module && module.default) {
+                    window.FHVisualOverlay = module.default;
+                }
+            });
+    }
+    return visualOverlayModulePromise;
+}
