@@ -290,6 +290,9 @@ const VisualOverlay = {
                 if (!this.selectedCategories.has(categoryName)) return;
                 if (!Array.isArray(category?.biomarkers) || category.biomarkers.length === 0) return;
 
+                // Consolidate biomarkers by name
+                const consolidatedBiomarkers = consolidateBiomarkersByName(category.biomarkers);
+
                 const categoryHeader = document.createElement('div');
                 categoryHeader.className = 'fh-category-header';
                 categoryHeader.dataset.category = categoryName;
@@ -298,14 +301,13 @@ const VisualOverlay = {
                 title.textContent = categoryName;
 
                 const meta = document.createElement('span');
-                meta.textContent = `${category.biomarkers.length} biomarkers`;
+                meta.textContent = `${consolidatedBiomarkers.length} biomarkers`;
 
                 categoryHeader.appendChild(title);
                 categoryHeader.appendChild(meta);
                 list.appendChild(categoryHeader);
 
-                category.biomarkers
-                    .slice()
+                consolidatedBiomarkers
                     .sort((a, b) => {
                         const aOutOfRange = isOutOfRange(a);
                         const bOutOfRange = isOutOfRange(b);
@@ -347,6 +349,73 @@ const VisualOverlay = {
         }
     }
 };
+
+// ===== DATA CONSOLIDATION =====
+
+function consolidateBiomarkersByName(biomarkers) {
+    console.log(`[Consolidate] Starting with ${biomarkers.length} biomarker entries`);
+    const groups = {};
+    
+    biomarkers.forEach((biomarker) => {
+        const key = biomarker.name.trim();
+        
+        if (!groups[key]) {
+            groups[key] = {
+                name: biomarker.name,
+                unit: biomarker.unit,
+                referenceRange: biomarker.referenceRange,
+                allResults: []
+            };
+        }
+        
+        // Add this result to the consolidated list
+        groups[key].allResults.push({
+            date: biomarker.date || biomarker.dateOfService,
+            value: biomarker.value,
+            unit: biomarker.unit || groups[key].unit,
+            status: biomarker.status,
+            historicalValues: biomarker.historicalValues || []
+        });
+        
+        // Merge historical values if present
+        if (Array.isArray(biomarker.historicalValues)) {
+            biomarker.historicalValues.forEach(hv => {
+                if (hv.date && !groups[key].allResults.some(r => r.date === hv.date)) {
+                    groups[key].allResults.push({
+                        date: hv.date,
+                        value: hv.value,
+                        unit: hv.unit || groups[key].unit,
+                        status: hv.inRange === false ? 'Out of Range' : hv.status || 'In Range',
+                        historicalValues: []
+                    });
+                }
+            });
+        }
+    });
+    
+    // Convert back to biomarker objects with consolidated historical values
+    const consolidated = Object.values(groups).map(group => ({
+        name: group.name,
+        unit: group.unit,
+        referenceRange: group.referenceRange,
+        historicalValues: group.allResults
+            .filter(r => r.date)
+            .sort((a, b) => new Date(a.date) - new Date(b.date))
+            .map(r => ({
+                date: r.date,
+                value: r.value,
+                unit: r.unit,
+                status: r.status
+            })),
+        // Latest values for convenience
+        date: group.allResults.length > 0 ? group.allResults[group.allResults.length - 1].date : null,
+        value: group.allResults.length > 0 ? group.allResults[group.allResults.length - 1].value : null,
+        status: group.allResults.length > 0 ? group.allResults[group.allResults.length - 1].status : 'Unknown'
+    }));
+    
+    console.log(`[Consolidate] Reduced to ${consolidated.length} unique biomarkers`);
+    return consolidated;
+}
 
 // ===== BIOMARKER TYPE DETECTION =====
 
@@ -418,6 +487,8 @@ function createBiomarkerCard(biomarker) {
     const type = detectBiomarkerType(biomarker);
     const latestEntry = events[events.length - 1] || {};
     
+    console.log(`[Visual Card] ${biomarker.name}: type=${type}, events=${events.length}, hasRefRange=${!!biomarker.referenceRange}`);
+    
     const card = document.createElement('article');
     card.className = `fh-bio-card fh-bio-card--${type}`;
 
@@ -442,7 +513,7 @@ function createBiomarkerCard(biomarker) {
 
     const refInfo = document.createElement('div');
     refInfo.className = 'fh-reference-info';
-    refInfo.textContent = formatReferenceInfo(type, latestEntry);
+    refInfo.textContent = formatReferenceInfo(type, biomarker, latestEntry);
     header.appendChild(refInfo);
 
     // HERO METRICS
@@ -475,18 +546,24 @@ function createBiomarkerCard(biomarker) {
     card.appendChild(header);
 
     // VISUALIZATION
+    console.log(`[Visual Card] ${biomarker.name}: Rendering chart type=${type}, events=${events.length}`);
     if (type === 'numeric-band' && events.length > 1) {
+        console.log(`[Visual Card] Creating band chart for ${biomarker.name}`);
         const chart = createBandChart(events);
         card.appendChild(chart);
     } else if (type === 'threshold' && events.length > 1) {
+        console.log(`[Visual Card] Creating threshold chart for ${biomarker.name}`);
         const chart = createThresholdChart(events);
         card.appendChild(chart);
     } else if (type === 'categorical') {
+        console.log(`[Visual Card] Creating categorical timeline for ${biomarker.name}`);
         const timeline = createCategoricalTimeline(events);
         card.appendChild(timeline);
     } else if (type === 'static') {
+        console.log(`[Visual Card] Static card for ${biomarker.name}, no chart`);
         // No chart for static single-value tests
     } else {
+        console.log(`[Visual Card] Creating fallback sparkline for ${biomarker.name}`);
         // Fallback simple sparkline
         const chart = createSimpleSparkline(events);
         card.appendChild(chart);
@@ -933,23 +1010,29 @@ function getTrendInsight(events) {
     return null;
 }
 
-function formatReferenceInfo(type, latestEntry) {
-    const unit = latestEntry.unit || '';
+function formatReferenceInfo(type, biomarker, latestEntry) {
+    const unit = latestEntry.unit || biomarker.unit || '';
+    const refRange = biomarker.referenceRange || '';
+    
+    // If we have actual reference range data, use it
+    if (refRange && refRange !== '') {
+        return `Normal: ${refRange} ${unit}`.trim();
+    }
     
     switch (type) {
         case 'categorical':
             return `Expected: ${getCategoricalExpected(latestEntry.value)}`;
         case 'threshold':
             if (String(latestEntry.value || '').includes('<')) {
-                return `Target: below threshold ${unit}`.trim();
+                return `Target: below threshold${unit ? ' • ' + unit : ''}`;
             } else if (String(latestEntry.value || '').includes('>')) {
-                return `Target: above threshold ${unit}`.trim();
+                return `Target: above threshold${unit ? ' • ' + unit : ''}`;
             }
-            return `Threshold-based ${unit}`.trim();
+            return unit ? `Threshold-based • ${unit}` : 'Threshold-based';
         case 'static':
             return 'Informational value';
         default:
-            return unit ? `Reference range not available • ${unit}` : 'Reference range not available';
+            return unit ? `Units: ${unit}` : 'No reference range available';
     }
 }
 
