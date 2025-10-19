@@ -633,7 +633,7 @@ function createBandChart(events, referenceRange) {
 
     const width = 600;
     const height = 200;
-    const padding = { top: 20, right: 40, bottom: 40, left: 100 };
+    const padding = { top: 20, right: 120, bottom: 40, left: 60 };
 
     const numericEvents = events
         .map(e => ({ ...e, numericValue: extractNumericValue(e.value) }))
@@ -696,10 +696,11 @@ function createBandChart(events, referenceRange) {
         aboveRect.setAttribute('fill', BAND_COLORS.above);
         svg.appendChild(aboveRect);
 
-        const aboveLabel = createSVGText('Above Range', padding.left - 5, padding.top + (upperY - padding.top) / 2, 'end', 10, '#8e5b5b');
+        const aboveLabel = createSVGText('Above Range', width - padding.right + 8, padding.top + (upperY - padding.top) / 2, 'start', 11, '#8e5b5b');
+        aboveLabel.setAttribute('font-weight', '600');
         svg.appendChild(aboveLabel);
         
-        const upperBoundLabel = createSVGText(`> ${upperBound}`, padding.left - 5, upperY - 3, 'end', 9, '#8e5b5b');
+        const upperBoundLabel = createSVGText(`> ${upperBound}`, width - padding.right + 8, upperY - 5, 'start', 10, '#8e5b5b');
         upperBoundLabel.setAttribute('font-style', 'italic');
         svg.appendChild(upperBoundLabel);
     }
@@ -713,11 +714,11 @@ function createBandChart(events, referenceRange) {
     inRangeRect.setAttribute('fill', BAND_COLORS.inRange);
     svg.appendChild(inRangeRect);
 
-    const inRangeLabel = createSVGText('In Range', padding.left - 5, upperY + (lowerY - upperY) / 2, 'end', 11, '#2a7d5f');
-    inRangeLabel.setAttribute('font-weight', '600');
+    const inRangeLabel = createSVGText('In Range', width - padding.right + 8, upperY + (lowerY - upperY) / 2 - 6, 'start', 12, '#2a7d5f');
+    inRangeLabel.setAttribute('font-weight', '700');
     svg.appendChild(inRangeLabel);
     
-    const rangeText = createSVGText(`${lowerBound}–${upperBound}`, padding.left - 5, upperY + (lowerY - upperY) / 2 + 12, 'end', 9, '#2a7d5f');
+    const rangeText = createSVGText(`${lowerBound}–${upperBound}`, width - padding.right + 8, upperY + (lowerY - upperY) / 2 + 8, 'start', 10, '#2a7d5f');
     rangeText.setAttribute('font-style', 'italic');
     svg.appendChild(rangeText);
 
@@ -732,10 +733,11 @@ function createBandChart(events, referenceRange) {
         belowRect.setAttribute('fill', BAND_COLORS.below);
         svg.appendChild(belowRect);
 
-        const belowLabel = createSVGText('Below Range', padding.left - 5, lowerY + ((height - padding.bottom) - lowerY) / 2, 'end', 10, '#9d7030');
+        const belowLabel = createSVGText('Below Range', width - padding.right + 8, lowerY + ((height - padding.bottom) - lowerY) / 2, 'start', 11, '#9d7030');
+        belowLabel.setAttribute('font-weight', '600');
         svg.appendChild(belowLabel);
         
-        const lowerBoundLabel = createSVGText(`< ${lowerBound}`, padding.left - 5, lowerY + 12, 'end', 9, '#9d7030');
+        const lowerBoundLabel = createSVGText(`< ${lowerBound}`, width - padding.right + 8, lowerY + 15, 'start', 10, '#9d7030');
         lowerBoundLabel.setAttribute('font-style', 'italic');
         svg.appendChild(lowerBoundLabel);
     }
@@ -810,7 +812,7 @@ function createThresholdChart(events, referenceRange) {
 
     const width = 600;
     const height = 120;
-    const padding = { top: 20, right: 40, bottom: 30, left: 100 };
+    const padding = { top: 20, right: 80, bottom: 30, left: 60 };
 
     const numericEvents = events
         .map(e => ({ ...e, numericValue: extractNumericValue(e.value) }))
