@@ -607,6 +607,13 @@ function detectBiomarkerType(biomarker) {
     }
 
     const values = events.map(e => String(e.value || '').trim());
+    
+    // Check for titer/ratio format (1:320, 1:1280, etc.)
+    const titerCount = values.filter(v => /1\s*:\s*\d+/.test(v)).length;
+    if (titerCount > values.length / 2) {
+        return 'titer-ladder';
+    }
+    
     const numericCount = values.filter(v => isNumericValue(v)).length;
     const categoricalCount = values.filter(v => isNonNumericValue(v)).length;
 
@@ -722,7 +729,11 @@ function createBiomarkerCard(biomarker) {
     const parsedRefRange = parseReferenceRange(biomarker.referenceRange);
     console.log(`[Visual Card] ${biomarker.name}: type=${type}, events=${events.length}, refRange=`, parsedRefRange);
     
-    if (type === 'numeric-band' && events.length > 1) {
+    if (type === 'titer-ladder') {
+        console.log(`[Visual Card] Creating titer ladder for ${biomarker.name}`);
+        const chart = createTiterLadder(events, parsedRefRange);
+        card.appendChild(chart);
+    } else if (type === 'numeric-band' && events.length > 1) {
         console.log(`[Visual Card] Creating band chart for ${biomarker.name}`);
         const chart = createBandChart(events, parsedRefRange);
         card.appendChild(chart);
@@ -799,6 +810,211 @@ function parseReferenceRange(rangeString) {
 }
 
 // ===== CHART RENDERERS =====
+
+function createTiterLadder(events, referenceRange) {
+    const container = document.createElement('div');
+    container.className = 'fh-chart-container fh-titer-ladder-container';
+
+    const width = 600;
+    const height = 220;
+    const padding = { top: 30, right: 120, bottom: 40, left: 80 };
+
+    // Standard titer dilution series
+    const titerLevels = [40, 80, 160, 320, 640, 1280, 2560, 5120];
+    
+    // Parse titer values from events
+    const titerEvents = events.map(e => {
+        const match = String(e.value || '').match(/1\s*:\s*(\d+)/);
+        const titerValue = match ? parseInt(match[1]) : null;
+        return { ...e, titerValue };
+    }).filter(e => e.titerValue !== null);
+
+    if (titerEvents.length === 0) {
+        container.textContent = 'Unable to parse titer values';
+        return container;
+    }
+
+    // Determine which titer levels to show based on data
+    const allTiterValues = titerEvents.map(e => e.titerValue);
+    const minTiter = Math.min(...allTiterValues);
+    const maxTiter = Math.max(...allTiterValues);
+    
+    const relevantLevels = titerLevels.filter(level => 
+        level >= minTiter / 2 && level <= maxTiter * 2
+    );
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    svg.classList.add('fh-titer-ladder');
+
+    const chartHeight = height - padding.top - padding.bottom;
+    const chartWidth = width - padding.left - padding.right;
+    const rungHeight = chartHeight / (relevantLevels.length - 1 || 1);
+
+    // Define severity zones
+    const normalThreshold = 40;
+    const borderlineThreshold = 320;
+    const elevatedThreshold = 640;
+
+    // Draw severity zone backgrounds
+    relevantLevels.forEach((level, index) => {
+        const y = padding.top + (relevantLevels.length - 1 - index) * rungHeight;
+        const nextY = index < relevantLevels.length - 1 ? y + rungHeight : height - padding.bottom;
+        
+        let zoneColor;
+        let zoneName;
+        if (level <= normalThreshold) {
+            zoneColor = 'rgba(48, 196, 141, 0.08)';
+            zoneName = 'Normal';
+        } else if (level <= borderlineThreshold) {
+            zoneColor = 'rgba(247, 178, 103, 0.08)';
+            zoneName = 'Borderline';
+        } else if (level <= elevatedThreshold) {
+            zoneColor = 'rgba(247, 112, 112, 0.08)';
+            zoneName = 'Elevated';
+        } else {
+            zoneColor = 'rgba(184, 51, 51, 0.10)';
+            zoneName = 'High';
+        }
+
+        const zoneRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        zoneRect.setAttribute('x', padding.left);
+        zoneRect.setAttribute('y', y);
+        zoneRect.setAttribute('width', chartWidth);
+        zoneRect.setAttribute('height', nextY - y);
+        zoneRect.setAttribute('fill', zoneColor);
+        svg.appendChild(zoneRect);
+
+        // Zone label on right
+        if (index === 0 || level === normalThreshold + 40 || level === borderlineThreshold + 160 || level === elevatedThreshold + 320) {
+            const zoneLabel = createSVGText(zoneName, width - padding.right + 8, y + (nextY - y) / 2, 'start', 11, '#6a7395');
+            zoneLabel.setAttribute('font-weight', '600');
+            svg.appendChild(zoneLabel);
+        }
+    });
+
+    // Draw horizontal rungs (titer levels)
+    relevantLevels.forEach((level, index) => {
+        const y = padding.top + (relevantLevels.length - 1 - index) * rungHeight;
+        
+        const rung = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        rung.setAttribute('x1', padding.left);
+        rung.setAttribute('y1', y);
+        rung.setAttribute('x2', padding.left + chartWidth);
+        rung.setAttribute('y2', y);
+        rung.setAttribute('stroke', 'rgba(102, 126, 234, 0.25)');
+        rung.setAttribute('stroke-width', '1.5');
+        rung.setAttribute('stroke-dasharray', '4,4');
+        svg.appendChild(rung);
+
+        // Titer label on left
+        const levelLabel = createSVGText(`1:${level}`, padding.left - 8, y, 'end', 11, '#4a5580');
+        levelLabel.setAttribute('alignment-baseline', 'middle');
+        levelLabel.setAttribute('font-weight', '600');
+        svg.appendChild(levelLabel);
+    });
+
+    // Plot data points on rungs
+    titerEvents.forEach((event, index) => {
+        const levelIndex = relevantLevels.indexOf(event.titerValue);
+        if (levelIndex === -1) {
+            // Titer not in standard levels, find closest
+            const closest = relevantLevels.reduce((prev, curr) => 
+                Math.abs(curr - event.titerValue) < Math.abs(prev - event.titerValue) ? curr : prev
+            );
+            const closestIndex = relevantLevels.indexOf(closest);
+            var y = padding.top + (relevantLevels.length - 1 - closestIndex) * rungHeight;
+        } else {
+            var y = padding.top + (relevantLevels.length - 1 - levelIndex) * rungHeight;
+        }
+        
+        const x = padding.left + (chartWidth / (titerEvents.length - 1 || 1)) * index;
+
+        // Draw connector to next point
+        if (index < titerEvents.length - 1) {
+            const nextEvent = titerEvents[index + 1];
+            const nextLevelIndex = relevantLevels.indexOf(nextEvent.titerValue);
+            const nextClosestIndex = nextLevelIndex === -1 ? relevantLevels.indexOf(
+                relevantLevels.reduce((prev, curr) => 
+                    Math.abs(curr - nextEvent.titerValue) < Math.abs(prev - nextEvent.titerValue) ? curr : prev
+                )
+            ) : nextLevelIndex;
+            const nextY = padding.top + (relevantLevels.length - 1 - nextClosestIndex) * rungHeight;
+            const nextX = padding.left + (chartWidth / (titerEvents.length - 1 || 1)) * (index + 1);
+
+            const connector = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            connector.setAttribute('x1', x);
+            connector.setAttribute('y1', y);
+            connector.setAttribute('x2', nextX);
+            connector.setAttribute('y2', nextY);
+            connector.setAttribute('stroke', '#4a5fc1');
+            connector.setAttribute('stroke-width', '2.5');
+            connector.setAttribute('stroke-linecap', 'round');
+            svg.appendChild(connector);
+
+            // Arrow if moving up/down
+            if (Math.abs(nextY - y) > 5) {
+                const midX = (x + nextX) / 2;
+                const midY = (y + nextY) / 2;
+                const arrowSize = 8;
+                const angle = Math.atan2(nextY - y, nextX - x);
+                
+                const arrowPath = `M ${midX},${midY} 
+                    L ${midX - arrowSize * Math.cos(angle - Math.PI / 6)},${midY - arrowSize * Math.sin(angle - Math.PI / 6)}
+                    M ${midX},${midY}
+                    L ${midX - arrowSize * Math.cos(angle + Math.PI / 6)},${midY - arrowSize * Math.sin(angle + Math.PI / 6)}`;
+                
+                const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                arrow.setAttribute('d', arrowPath);
+                arrow.setAttribute('stroke', '#4a5fc1');
+                arrow.setAttribute('stroke-width', '2');
+                arrow.setAttribute('fill', 'none');
+                arrow.setAttribute('stroke-linecap', 'round');
+                svg.appendChild(arrow);
+            }
+        }
+
+        // Data point marker
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', x);
+        circle.setAttribute('cy', y);
+        circle.setAttribute('r', 8);
+        circle.setAttribute('fill', STATUS_COLORS[event.status] || STATUS_COLORS.Unknown);
+        circle.setAttribute('stroke', '#ffffff');
+        circle.setAttribute('stroke-width', '2.5');
+        
+        const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        title.textContent = `${formatDisplayDate(event.date)}\n${event.value}\n${event.status}`;
+        circle.appendChild(title);
+        svg.appendChild(circle);
+
+        // Titer value label above marker
+        const valueLabel = createSVGText(
+            event.value,
+            x,
+            y - 16,
+            'middle',
+            12,
+            '#2d334c'
+        );
+        valueLabel.setAttribute('font-weight', '700');
+        svg.appendChild(valueLabel);
+
+        // Date label below chart
+        const dateLabel = createSVGText(
+            formatShortDate(event.date),
+            x,
+            height - padding.bottom + 18,
+            'middle',
+            11,
+            '#6c748c'
+        );
+        svg.appendChild(dateLabel);
+    });
+
+    container.appendChild(svg);
+    return container;
+}
 
 function createBandChart(events, referenceRange) {
     const container = document.createElement('div');
@@ -1210,22 +1426,58 @@ function determineBiomarkerStatus(events) {
 }
 
 function getDirectionBadge(events) {
+    if (events.length < 2) return null;
+    
+    const latest = events[events.length - 1];
+    const previous = events[events.length - 2];
+    
+    // Check if this is a titer
+    const isTiter = /1\s*:\s*\d+/.test(String(latest.value || ''));
+    
+    if (isTiter) {
+        const latestMatch = String(latest.value || '').match(/1\s*:\s*(\d+)/);
+        const previousMatch = String(previous.value || '').match(/1\s*:\s*(\d+)/);
+        
+        if (latestMatch && previousMatch) {
+            const latestTiter = parseInt(latestMatch[1]);
+            const previousTiter = parseInt(previousMatch[1]);
+            
+            const badge = document.createElement('div');
+            
+            if (latestTiter === previousTiter) {
+                badge.className = 'fh-direction fh-direction--flat';
+                badge.textContent = '→ Stable';
+            } else if (latestTiter > previousTiter) {
+                const fold = latestTiter / previousTiter;
+                badge.className = 'fh-direction fh-direction--up';
+                badge.textContent = fold >= 2 ? `▲ ${fold.toFixed(0)}× higher` : `▲ Increased`;
+            } else {
+                const fold = previousTiter / latestTiter;
+                badge.className = 'fh-direction fh-direction--down';
+                badge.textContent = fold >= 2 ? `▼ ${fold.toFixed(0)}× lower` : `▼ Decreased`;
+            }
+            
+            return badge;
+        }
+    }
+    
+    // Standard numeric percentage change
     const numericEvents = events
         .map(e => ({ ...e, numericValue: extractNumericValue(e.value) }))
         .filter(e => e.numericValue !== null);
     
     if (numericEvents.length < 2) return null;
     
-    const latest = numericEvents[numericEvents.length - 1].numericValue;
-    const previous = numericEvents[numericEvents.length - 2].numericValue;
-    const percentChange = ((latest - previous) / previous) * 100;
+    const latestNum = numericEvents[numericEvents.length - 1].numericValue;
+    const previousNum = numericEvents[numericEvents.length - 2].numericValue;
+    const percentChange = ((latestNum - previousNum) / previousNum) * 100;
     
     const badge = document.createElement('div');
     
     if (Math.abs(percentChange) < 5) {
         badge.className = 'fh-direction fh-direction--flat';
         badge.textContent = '→ Stable';
-    } else if (latest > previous) {
+    } else if (latestNum > previousNum) {
         badge.className = 'fh-direction fh-direction--up';
         badge.textContent = `▲ +${Math.abs(percentChange).toFixed(1)}%`;
     } else {
@@ -1280,6 +1532,8 @@ function formatReferenceInfo(type, biomarker, latestEntry) {
     }
     
     switch (type) {
+        case 'titer-ladder':
+            return 'Normal: <1:40';
         case 'categorical':
             return `Expected: ${getCategoricalExpected(latestEntry.value)}`;
         case 'threshold':
@@ -1752,9 +2006,14 @@ function injectStyles() {
 
         .fh-band-chart,
         .fh-threshold-chart,
-        .fh-simple-sparkline {
+        .fh-simple-sparkline,
+        .fh-titer-ladder {
             width: 100%;
             height: auto;
+        }
+        
+        .fh-titer-ladder-container {
+            margin: 10px 0;
         }
 
         .fh-categorical-timeline {
