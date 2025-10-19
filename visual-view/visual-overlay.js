@@ -223,9 +223,6 @@ const VisualOverlay = {
                             this.selectedCategories.add(name);
                         } else {
                             this.selectedCategories.delete(name);
-                            if (this.selectedCategories.size === 0) {
-                                categories.forEach((cat) => this.selectedCategories.add(cat));
-                            }
                         }
                         this.updateCategoryButton(dataset);
                         this.renderCards(dataset);
@@ -259,7 +256,6 @@ const VisualOverlay = {
         clearBtn.textContent = 'Clear';
         clearBtn.addEventListener('click', () => {
             this.selectedCategories.clear();
-            categories.forEach((cat) => this.selectedCategories.add(cat));
             this.updateCategoryButton(dataset);
             this.renderCards(dataset);
             buildList(searchInput.value);
@@ -309,9 +305,6 @@ const VisualOverlay = {
                     this.selectedDates.add(date);
                 } else {
                     this.selectedDates.delete(date);
-                    if (this.selectedDates.size === 0) {
-                        allDates.forEach((d) => this.selectedDates.add(d));
-                    }
                 }
                 this.updateDateButton(dataset);
                 this.renderCards(dataset);
@@ -342,10 +335,9 @@ const VisualOverlay = {
         clearBtn.textContent = 'Clear';
         clearBtn.addEventListener('click', () => {
             this.selectedDates.clear();
-            allDates.forEach((d) => this.selectedDates.add(d));
             this.updateDateButton(dataset);
             this.renderCards(dataset);
-            list.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
+            list.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
         });
 
         actions.appendChild(selectAllBtn);
@@ -375,28 +367,32 @@ const VisualOverlay = {
 
     updateCategoryButton(dataset) {
         const categories = Object.keys(dataset.categories).sort((a, b) => a.localeCompare(b));
-        if (!this.selectedCategories || this.selectedCategories.size === 0) {
-            this.selectedCategories = new Set(categories);
-        }
 
         if (this.categoryButton) {
-            const label = this.selectedCategories.size === categories.length
-                ? 'All categories'
-                : `${this.selectedCategories.size} selected`;
+            let label;
+            if (this.selectedCategories.size === 0) {
+                label = 'None selected';
+            } else if (this.selectedCategories.size === categories.length) {
+                label = 'All categories';
+            } else {
+                label = `${this.selectedCategories.size} selected`;
+            }
             this.categoryButton.textContent = label;
         }
     },
     
     updateDateButton(dataset) {
         const allDates = extractAllDates(dataset);
-        if (!this.selectedDates || this.selectedDates.size === 0) {
-            this.selectedDates = new Set(allDates);
-        }
 
         if (this.dateButton) {
-            const label = this.selectedDates.size === allDates.length
-                ? 'All dates'
-                : `${this.selectedDates.size} selected`;
+            let label;
+            if (this.selectedDates.size === 0) {
+                label = 'None selected';
+            } else if (this.selectedDates.size === allDates.length) {
+                label = 'All dates';
+            } else {
+                label = `${this.selectedDates.size} selected`;
+            }
             this.dateButton.textContent = label;
         }
     },
@@ -406,6 +402,24 @@ const VisualOverlay = {
         const existingList = this.content.querySelector('.fh-bio-grid');
         if (existingList) {
             existingList.remove();
+        }
+        
+        const existingEmpty = this.content.querySelector('.fh-empty-state');
+        if (existingEmpty) {
+            existingEmpty.remove();
+        }
+        
+        // Check if any selections exist
+        if (this.selectedCategories.size === 0 || this.selectedDates.size === 0) {
+            const emptyState = document.createElement('div');
+            emptyState.className = 'fh-empty-state';
+            emptyState.innerHTML = `
+                <div class="fh-empty-icon">📊</div>
+                <div class="fh-empty-title">No data selected</div>
+                <div class="fh-empty-message">Please select at least one category and one test date to view biomarker trends.</div>
+            `;
+            this.content.appendChild(emptyState);
+            return;
         }
 
         const list = document.createElement('div');
@@ -1560,6 +1574,34 @@ function injectStyles() {
         .fh-dropdown-item input {
             accent-color: #667eea;
             cursor: pointer;
+        }
+
+        .fh-empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 80px 40px;
+            text-align: center;
+        }
+
+        .fh-empty-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+            opacity: 0.4;
+        }
+
+        .fh-empty-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #3d4563;
+            margin-bottom: 8px;
+        }
+
+        .fh-empty-message {
+            font-size: 14px;
+            color: #6a7395;
+            max-width: 400px;
         }
 
         .fh-bio-grid {
