@@ -14,12 +14,14 @@ const BAND_COLORS = {
 const VisualOverlay = {
     container: null,
     content: null,
-    statusBar: null,
+    header: null,
     dataCache: null,
-    toolbar: null,
-    dropdown: null,
+    categoryDropdown: null,
+    dateDropdown: null,
     selectedCategories: null,
-    dropdownOpen: false,
+    selectedDates: null,
+    categoryDropdownOpen: false,
+    dateDropdownOpen: false,
 
     open(payload) {
         if (!payload || !payload.dataset) {
@@ -61,8 +63,8 @@ const VisualOverlay = {
         const title = document.createElement('h2');
         title.textContent = 'Biomarker Trends';
 
-        const statusBar = document.createElement('div');
-        statusBar.className = 'fh-visual-status';
+        const controls = document.createElement('div');
+        controls.className = 'fh-header-controls';
 
         const closeBtn = document.createElement('button');
         closeBtn.className = 'fh-visual-close';
@@ -72,9 +74,12 @@ const VisualOverlay = {
         closeBtn.addEventListener('click', () => this.close());
 
         header.appendChild(title);
-        header.appendChild(statusBar);
+        header.appendChild(controls);
         header.appendChild(closeBtn);
         panel.appendChild(header);
+        
+        this.header = header;
+        this.headerControls = controls;
 
         const body = document.createElement('div');
         body.className = 'fh-visual-body';
@@ -89,14 +94,16 @@ const VisualOverlay = {
 
         document.addEventListener('keydown', this.handleKeydown);
         document.addEventListener('click', (event) => {
-            if (this.dropdownOpen && this.dropdown && !this.dropdown.contains(event.target) && !this.toolbar?.contains(event.target)) {
-                this.closeDropdown();
+            if (this.categoryDropdownOpen && this.categoryDropdown && !this.categoryDropdown.contains(event.target) && !this.categoryButton?.contains(event.target)) {
+                this.closeCategoryDropdown();
+            }
+            if (this.dateDropdownOpen && this.dateDropdown && !this.dateDropdown.contains(event.target) && !this.dateButton?.contains(event.target)) {
+                this.closeDateDropdown();
             }
         });
 
         this.container = overlay;
         this.content = content;
-        this.statusBar = statusBar;
     },
 
     render() {
@@ -106,78 +113,97 @@ const VisualOverlay = {
         if (!this.selectedCategories) {
             this.selectedCategories = new Set(Object.keys(dataset.categories));
         }
+        
+        if (!this.selectedDates) {
+            this.selectedDates = new Set(extractAllDates(dataset));
+        }
 
-        this.renderStatusBar(dataset, filtersApplied, latestOnly);
-        this.renderToolbar(dataset);
+        this.renderHeaderControls(dataset);
         this.renderCards(dataset);
     },
 
-    renderStatusBar(dataset, filtersApplied, latestOnly) {
-        if (!this.statusBar) return;
-        this.statusBar.innerHTML = '';
-        const tokens = [
-            `${Object.keys(dataset.categories).length} categories`,
-            `${dataset.summary?.total ?? 0} biomarkers`,
-            filtersApplied ? 'Filters active' : 'All data',
-            latestOnly ? 'Latest only' : 'Full history'
-        ];
-        tokens.forEach((text) => {
-            const chip = document.createElement('span');
-            chip.className = 'fh-chip';
-            chip.textContent = text;
-            this.statusBar.appendChild(chip);
-        });
-    },
-
-    renderToolbar(dataset) {
-        if (!this.content) return;
-        if (!this.toolbar) {
-            const toolbar = document.createElement('div');
-            toolbar.className = 'fh-visual-toolbar fh-toolbar-inline';
-
-            const categoryControl = document.createElement('div');
-            categoryControl.className = 'fh-toolbar-control';
-
-            const label = document.createElement('span');
-            label.textContent = 'Categories';
-
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'fh-select-button';
-            button.textContent = 'All categories';
-            button.addEventListener('click', (event) => {
-                event.stopPropagation();
-                this.toggleDropdown(dataset, button);
-            });
-
-            categoryControl.appendChild(label);
-            categoryControl.appendChild(button);
-            toolbar.appendChild(categoryControl);
-
-            this.content.innerHTML = '';
-            this.content.appendChild(toolbar);
-            this.toolbar = toolbar;
-            this.selectButton = button;
-        }
-
-        this.updateCategorySelection(dataset);
-    },
-
-    toggleDropdown(dataset, anchorButton) {
-        if (this.dropdownOpen) {
-            this.closeDropdown();
+    renderHeaderControls(dataset) {
+        if (!this.headerControls) return;
+        
+        // Only render once
+        if (this.categoryButton && this.dateButton) {
+            this.updateCategoryButton(dataset);
+            this.updateDateButton(dataset);
             return;
         }
+        
+        this.headerControls.innerHTML = '';
+
+        // Category dropdown control
+        const categoryControl = document.createElement('div');
+        categoryControl.className = 'fh-header-control';
+
+        const categoryLabel = document.createElement('span');
+        categoryLabel.textContent = 'Categories';
+
+        const categoryButton = document.createElement('button');
+        categoryButton.type = 'button';
+        categoryButton.className = 'fh-header-select';
+        categoryButton.textContent = 'All categories';
+        categoryButton.addEventListener('click', (event) => {
+            event.stopPropagation();
+            this.toggleCategoryDropdown(dataset, categoryButton);
+        });
+
+        categoryControl.appendChild(categoryLabel);
+        categoryControl.appendChild(categoryButton);
+
+        // Date dropdown control
+        const dateControl = document.createElement('div');
+        dateControl.className = 'fh-header-control';
+
+        const dateLabel = document.createElement('span');
+        dateLabel.textContent = 'Test Dates';
+
+        const dateButton = document.createElement('button');
+        dateButton.type = 'button';
+        dateButton.className = 'fh-header-select';
+        dateButton.textContent = 'All dates';
+        dateButton.addEventListener('click', (event) => {
+            event.stopPropagation();
+            this.toggleDateDropdown(dataset, dateButton);
+        });
+
+        dateControl.appendChild(dateLabel);
+        dateControl.appendChild(dateButton);
+
+        this.headerControls.appendChild(categoryControl);
+        this.headerControls.appendChild(dateControl);
+
+        this.categoryButton = categoryButton;
+        this.dateButton = dateButton;
+        this.categoryControl = categoryControl;
+        this.dateControl = dateControl;
+        
+        this.updateCategoryButton(dataset);
+        this.updateDateButton(dataset);
+    },
+
+    toggleCategoryDropdown(dataset, anchorButton) {
+        if (this.categoryDropdownOpen) {
+            this.closeCategoryDropdown();
+            return;
+        }
+        
+        if (this.dateDropdownOpen) {
+            this.closeDateDropdown();
+        }
+        
         const dropdown = document.createElement('div');
-        dropdown.className = 'fh-select-dropdown';
+        dropdown.className = 'fh-header-dropdown';
 
         const searchInput = document.createElement('input');
         searchInput.type = 'search';
         searchInput.placeholder = 'Search categories';
-        searchInput.className = 'fh-select-search';
+        searchInput.className = 'fh-dropdown-search';
 
         const list = document.createElement('div');
-        list.className = 'fh-select-list';
+        list.className = 'fh-dropdown-list';
 
         const categories = Object.keys(dataset.categories).sort((a, b) => a.localeCompare(b));
 
@@ -187,7 +213,7 @@ const VisualOverlay = {
                 .filter((name) => name.toLowerCase().includes(query.toLowerCase()))
                 .forEach((name) => {
                     const item = document.createElement('label');
-                    item.className = 'fh-select-item';
+                    item.className = 'fh-dropdown-item';
 
                     const checkbox = document.createElement('input');
                     checkbox.type = 'checkbox';
@@ -201,7 +227,7 @@ const VisualOverlay = {
                                 categories.forEach((cat) => this.selectedCategories.add(cat));
                             }
                         }
-                        this.updateCategorySelection(dataset);
+                        this.updateCategoryButton(dataset);
                         this.renderCards(dataset);
                     });
 
@@ -216,14 +242,14 @@ const VisualOverlay = {
         searchInput.addEventListener('input', () => buildList(searchInput.value));
 
         const actions = document.createElement('div');
-        actions.className = 'fh-select-actions';
+        actions.className = 'fh-dropdown-actions';
 
         const selectAllBtn = document.createElement('button');
         selectAllBtn.type = 'button';
         selectAllBtn.textContent = 'Select all';
         selectAllBtn.addEventListener('click', () => {
             categories.forEach((cat) => this.selectedCategories.add(cat));
-            this.updateCategorySelection(dataset);
+            this.updateCategoryButton(dataset);
             this.renderCards(dataset);
             buildList(searchInput.value);
         });
@@ -234,7 +260,7 @@ const VisualOverlay = {
         clearBtn.addEventListener('click', () => {
             this.selectedCategories.clear();
             categories.forEach((cat) => this.selectedCategories.add(cat));
-            this.updateCategorySelection(dataset);
+            this.updateCategoryButton(dataset);
             this.renderCards(dataset);
             buildList(searchInput.value);
         });
@@ -247,30 +273,131 @@ const VisualOverlay = {
         dropdown.appendChild(list);
 
         anchorButton.parentElement.appendChild(dropdown);
-        this.dropdown = dropdown;
-        this.dropdownOpen = true;
+        this.categoryDropdown = dropdown;
+        this.categoryDropdownOpen = true;
         buildList();
         searchInput.focus({ preventScroll: true });
     },
 
-    closeDropdown() {
-        if (!this.dropdown) return;
-        this.dropdown.remove();
-        this.dropdown = null;
-        this.dropdownOpen = false;
+    toggleDateDropdown(dataset, anchorButton) {
+        if (this.dateDropdownOpen) {
+            this.closeDateDropdown();
+            return;
+        }
+        
+        if (this.categoryDropdownOpen) {
+            this.closeCategoryDropdown();
+        }
+        
+        const dropdown = document.createElement('div');
+        dropdown.className = 'fh-header-dropdown';
+
+        const list = document.createElement('div');
+        list.className = 'fh-dropdown-list';
+
+        const allDates = extractAllDates(dataset).sort((a, b) => new Date(b) - new Date(a));
+
+        allDates.forEach((date) => {
+            const item = document.createElement('label');
+            item.className = 'fh-dropdown-item';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = this.selectedDates.has(date);
+            checkbox.addEventListener('change', () => {
+                if (checkbox.checked) {
+                    this.selectedDates.add(date);
+                } else {
+                    this.selectedDates.delete(date);
+                    if (this.selectedDates.size === 0) {
+                        allDates.forEach((d) => this.selectedDates.add(d));
+                    }
+                }
+                this.updateDateButton(dataset);
+                this.renderCards(dataset);
+            });
+
+            item.appendChild(checkbox);
+            const span = document.createElement('span');
+            span.textContent = formatDisplayDate(date);
+            item.appendChild(span);
+            list.appendChild(item);
+        });
+
+        const actions = document.createElement('div');
+        actions.className = 'fh-dropdown-actions';
+
+        const selectAllBtn = document.createElement('button');
+        selectAllBtn.type = 'button';
+        selectAllBtn.textContent = 'Select all';
+        selectAllBtn.addEventListener('click', () => {
+            allDates.forEach((d) => this.selectedDates.add(d));
+            this.updateDateButton(dataset);
+            this.renderCards(dataset);
+            list.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
+        });
+
+        const clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.textContent = 'Clear';
+        clearBtn.addEventListener('click', () => {
+            this.selectedDates.clear();
+            allDates.forEach((d) => this.selectedDates.add(d));
+            this.updateDateButton(dataset);
+            this.renderCards(dataset);
+            list.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
+        });
+
+        actions.appendChild(selectAllBtn);
+        actions.appendChild(clearBtn);
+
+        dropdown.appendChild(actions);
+        dropdown.appendChild(list);
+
+        anchorButton.parentElement.appendChild(dropdown);
+        this.dateDropdown = dropdown;
+        this.dateDropdownOpen = true;
     },
 
-    updateCategorySelection(dataset) {
+    closeCategoryDropdown() {
+        if (!this.categoryDropdown) return;
+        this.categoryDropdown.remove();
+        this.categoryDropdown = null;
+        this.categoryDropdownOpen = false;
+    },
+    
+    closeDateDropdown() {
+        if (!this.dateDropdown) return;
+        this.dateDropdown.remove();
+        this.dateDropdown = null;
+        this.dateDropdownOpen = false;
+    },
+
+    updateCategoryButton(dataset) {
         const categories = Object.keys(dataset.categories).sort((a, b) => a.localeCompare(b));
         if (!this.selectedCategories || this.selectedCategories.size === 0) {
             this.selectedCategories = new Set(categories);
         }
 
-        if (this.selectButton) {
+        if (this.categoryButton) {
             const label = this.selectedCategories.size === categories.length
                 ? 'All categories'
                 : `${this.selectedCategories.size} selected`;
-            this.selectButton.textContent = label;
+            this.categoryButton.textContent = label;
+        }
+    },
+    
+    updateDateButton(dataset) {
+        const allDates = extractAllDates(dataset);
+        if (!this.selectedDates || this.selectedDates.size === 0) {
+            this.selectedDates = new Set(allDates);
+        }
+
+        if (this.dateButton) {
+            const label = this.selectedDates.size === allDates.length
+                ? 'All dates'
+                : `${this.selectedDates.size} selected`;
+            this.dateButton.textContent = label;
         }
     },
 
@@ -292,6 +419,19 @@ const VisualOverlay = {
 
                 // Consolidate biomarkers by name
                 const consolidatedBiomarkers = consolidateBiomarkersByName(category.biomarkers);
+                
+                // Filter biomarkers by selected dates
+                const filteredBiomarkers = consolidatedBiomarkers.map(biomarker => {
+                    const filteredHistorical = biomarker.historicalValues.filter(hv => 
+                        this.selectedDates.has(hv.date)
+                    );
+                    return {
+                        ...biomarker,
+                        historicalValues: filteredHistorical
+                    };
+                }).filter(biomarker => biomarker.historicalValues.length > 0);
+
+                if (filteredBiomarkers.length === 0) return;
 
                 const categoryHeader = document.createElement('div');
                 categoryHeader.className = 'fh-category-header';
@@ -301,13 +441,13 @@ const VisualOverlay = {
                 title.textContent = categoryName;
 
                 const meta = document.createElement('span');
-                meta.textContent = `${consolidatedBiomarkers.length} biomarkers`;
+                meta.textContent = `${filteredBiomarkers.length} biomarkers`;
 
                 categoryHeader.appendChild(title);
                 categoryHeader.appendChild(meta);
                 list.appendChild(categoryHeader);
 
-                consolidatedBiomarkers
+                filteredBiomarkers
                     .sort((a, b) => {
                         const aOutOfRange = isOutOfRange(a);
                         const bOutOfRange = isOutOfRange(b);
@@ -332,10 +472,12 @@ const VisualOverlay = {
                 this.container.remove();
                 this.container = null;
                 this.content = null;
-                this.statusBar = null;
-                this.toolbar = null;
-                this.dropdown = null;
-                this.dropdownOpen = false;
+                this.header = null;
+                this.headerControls = null;
+                this.categoryDropdown = null;
+                this.dateDropdown = null;
+                this.categoryDropdownOpen = false;
+                this.dateDropdownOpen = false;
                 document.removeEventListener('keydown', this.handleKeydown);
                 document.body.classList.remove('fh-visual-no-scroll');
             }
@@ -351,6 +493,23 @@ const VisualOverlay = {
 };
 
 // ===== DATA CONSOLIDATION =====
+
+function extractAllDates(dataset) {
+    const dates = new Set();
+    Object.values(dataset.categories).forEach(category => {
+        if (!Array.isArray(category.biomarkers)) return;
+        category.biomarkers.forEach(biomarker => {
+            if (biomarker.date) dates.add(biomarker.date);
+            if (biomarker.dateOfService) dates.add(biomarker.dateOfService);
+            if (Array.isArray(biomarker.historicalValues)) {
+                biomarker.historicalValues.forEach(hv => {
+                    if (hv.date) dates.add(hv.date);
+                });
+            }
+        });
+    });
+    return Array.from(dates).sort((a, b) => new Date(b) - new Date(a));
+}
 
 function consolidateBiomarkersByName(biomarkers) {
     console.log(`[Consolidate] Starting with ${biomarkers.length} biomarker entries`);
@@ -1238,7 +1397,8 @@ function injectStyles() {
         .fh-visual-header {
             display: flex;
             align-items: center;
-            padding: 22px 28px;
+            gap: 20px;
+            padding: 20px 28px;
             background: linear-gradient(135deg, rgba(102, 126, 234, 0.18), rgba(118, 75, 162, 0.14));
             border-bottom: 1px solid rgba(102, 126, 234, 0.28);
         }
@@ -1250,32 +1410,45 @@ function injectStyles() {
             font-weight: 700;
         }
 
-        .fh-visual-status {
-            margin-left: auto;
+        .fh-header-controls {
             display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
+            gap: 16px;
+            margin-left: auto;
+            align-items: flex-end;
         }
 
-        .fh-chip {
-            background: rgba(102, 126, 234, 0.2);
-            color: #4a55a2;
-            padding: 7px 14px;
-            border-radius: 999px;
-            font-size: 12px;
-            font-weight: 600;
-            letter-spacing: 0.02em;
+        .fh-header-control {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            position: relative;
         }
 
-        .fh-chip--ghost {
-            background: rgba(102, 126, 234, 0.12);
-            color: #4a55a2;
+        .fh-header-control span {
+            font-size: 10px;
+            font-weight: 700;
+            color: #3d4a7a;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .fh-header-select {
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            background: rgba(255, 255, 255, 0.92);
+            padding: 8px 14px;
+            border-radius: 10px;
+            font-size: 13px;
+            color: #2c3555;
             cursor: pointer;
-            transition: background 0.2s ease;
+            min-width: 160px;
+            text-align: left;
+            transition: all 0.2s ease;
+            font-weight: 600;
         }
 
-        .fh-chip--ghost:hover {
-            background: rgba(102, 126, 234, 0.22);
+        .fh-header-select:hover {
+            background: #ffffff;
+            border-color: rgba(255, 255, 255, 0.9);
         }
 
         .fh-visual-close {
@@ -1308,67 +1481,26 @@ function injectStyles() {
             display: flex;
             flex-direction: column;
             gap: 20px;
-        }
-
-        .fh-visual-toolbar {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 16px;
-            align-items: flex-end;
             padding-top: 20px;
-            padding-bottom: 8px;
         }
 
-        .fh-toolbar-control {
-            display: flex;
-            flex-direction: column;
-            gap: 7px;
-            position: relative;
-        }
-
-        .fh-toolbar-control span {
-            font-size: 11px;
-            font-weight: 700;
-            color: #53618c;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-        }
-
-        .fh-select-button {
-            border: 1px solid rgba(102, 126, 234, 0.35);
-            background: rgba(255, 255, 255, 0.95);
-            padding: 10px 16px;
-            border-radius: 10px;
-            font-size: 14px;
-            color: #49538d;
-            cursor: pointer;
-            min-width: 200px;
-            text-align: left;
-            transition: all 0.2s ease;
-        }
-
-        .fh-select-button:hover {
-            background: #ffffff;
-            border-color: rgba(102, 126, 234, 0.5);
-        }
-
-        .fh-select-dropdown {
+        .fh-header-dropdown {
             position: absolute;
             top: calc(100% + 10px);
             left: 0;
-            z-index: 30;
+            z-index: 40;
             width: 280px;
             background: #ffffff;
             border-radius: 14px;
-            box-shadow: 0 24px 48px rgba(51, 57, 100, 0.22);
-            border: 1px solid rgba(102, 126, 234, 0.2);
+            box-shadow: 0 24px 48px rgba(51, 57, 100, 0.28);
+            border: 1px solid rgba(102, 126, 234, 0.25);
             padding: 14px;
             display: flex;
             flex-direction: column;
             gap: 12px;
         }
 
-        .fh-select-search {
+        .fh-dropdown-search {
             padding: 9px 12px;
             border-radius: 9px;
             border: 1px solid rgba(102, 126, 234, 0.3);
@@ -1376,16 +1508,16 @@ function injectStyles() {
             outline: none;
         }
 
-        .fh-select-search:focus {
+        .fh-dropdown-search:focus {
             border-color: rgba(102, 126, 234, 0.5);
         }
 
-        .fh-select-actions {
+        .fh-dropdown-actions {
             display: flex;
             gap: 8px;
         }
 
-        .fh-select-actions button {
+        .fh-dropdown-actions button {
             flex: 1;
             padding: 7px 10px;
             border-radius: 8px;
@@ -1395,36 +1527,37 @@ function injectStyles() {
             font-size: 12px;
             cursor: pointer;
             transition: background 0.2s ease;
+            font-weight: 600;
         }
 
-        .fh-select-actions button:hover {
+        .fh-dropdown-actions button:hover {
             background: rgba(102, 126, 234, 0.2);
         }
 
-        .fh-select-list {
-            max-height: 220px;
+        .fh-dropdown-list {
+            max-height: 240px;
             overflow-y: auto;
             display: grid;
             gap: 7px;
         }
 
-        .fh-select-item {
+        .fh-dropdown-item {
             display: flex;
             gap: 10px;
             align-items: center;
             font-size: 13px;
             color: #414674;
             cursor: pointer;
-            padding: 4px 6px;
-            border-radius: 6px;
+            padding: 5px 7px;
+            border-radius: 7px;
             transition: background 0.2s ease;
         }
 
-        .fh-select-item:hover {
-            background: rgba(102, 126, 234, 0.08);
+        .fh-dropdown-item:hover {
+            background: rgba(102, 126, 234, 0.1);
         }
 
-        .fh-select-item input {
+        .fh-dropdown-item input {
             accent-color: #667eea;
             cursor: pointer;
         }
