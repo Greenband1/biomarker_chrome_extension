@@ -2559,6 +2559,44 @@ function createMiniSparkline(events, refData) {
         svg.appendChild(bandRect);
     }
     
+    // Draw threshold line and shaded region for threshold-type biomarkers
+    if (refData?.type === 'threshold' && refData.value !== undefined) {
+        const thresholdVal = refData.value;
+        // Only draw if threshold is within or near the visible data range
+        if (thresholdVal >= min * 0.5 && thresholdVal <= max * 1.5) {
+            const thresholdY = padding + ((height - padding * 2) - ((thresholdVal - min) / range) * (height - padding * 2));
+            const clampedY = Math.max(0, Math.min(height, thresholdY));
+            
+            // Shade the "good" region (green tint)
+            const isUpperBound = refData.direction === 'upper';
+            const goodRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            goodRect.setAttribute('x', 0);
+            goodRect.setAttribute('width', width);
+            if (isUpperBound) {
+                // Good is below threshold (lower values are better)
+                goodRect.setAttribute('y', clampedY);
+                goodRect.setAttribute('height', Math.max(0, height - clampedY));
+            } else {
+                // Good is above threshold (higher values are better)
+                goodRect.setAttribute('y', 0);
+                goodRect.setAttribute('height', Math.max(0, clampedY));
+            }
+            goodRect.setAttribute('fill', 'rgba(48, 196, 141, 0.12)');
+            svg.appendChild(goodRect);
+            
+            // Draw dashed threshold line
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', 0);
+            line.setAttribute('x2', width);
+            line.setAttribute('y1', clampedY);
+            line.setAttribute('y2', clampedY);
+            line.setAttribute('stroke', '#30c48d');
+            line.setAttribute('stroke-width', '1.5');
+            line.setAttribute('stroke-dasharray', '4,3');
+            svg.appendChild(line);
+        }
+    }
+    
     // Draw line with increased stroke width
     if (points.length > 1) {
         const pathData = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
