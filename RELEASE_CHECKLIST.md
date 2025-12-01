@@ -149,13 +149,13 @@ Use this checklist before publishing updates to GitHub or Chrome Web Store.
 ```bash
 # Prepare release
 git add .
-git commit -m "Release v2.0.1: [brief description]"
-git tag v2.0.1
+git commit -m "Release v2.4.0: Health-focused UI redesign"
+git tag v2.4.0
 git push origin main --tags
 
 # Create GitHub release
 # Go to GitHub → Releases → Create new release
-# Select tag v2.0.1, add release notes
+# Select tag v2.4.0, add release notes
 ```
 
 **Remember:** Test thoroughly before each release. Users depend on this extension for their health data!

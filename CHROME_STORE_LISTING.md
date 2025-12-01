@@ -31,7 +31,7 @@ Export your biomarker data from Function Health into convenient formats for anal
 ✅ Progressive Interface - Export options appear after extraction for clean workflow
 ✅ Auto-Navigation - Automatically navigates to correct Function Health page
 ✅ Session Filters - Filter preferences persist during your session
-✅ Professional Design - Modern interface with clear visual hierarchy
+✅ Premium Design - Health-focused UI with custom icons, DM Sans typography, and refined micro-interactions
 
 📊 BIOMARKER CATEGORIES
 
@@ -201,7 +201,7 @@ This extension is not affiliated with Function Health. Users are responsible for
 ## Store Submission Checklist
 
 ### **Before Submission**
-- [ ] Extension ZIP package created (✅ Done: functionhealth_extension_v2.0.1.zip)
+- [ ] Extension ZIP package created (✅ Done: personal_health_data_tool_v2.4.0.zip)
 - [ ] Developer account registered and verified
 - [ ] $5 registration fee paid
 - [ ] Screenshots prepared (1-5 images)
@@ -254,5 +254,5 @@ This extension is not affiliated with Function Health. Users are responsible for
 - **Updates**: Free
 - **Total cost**: $5
 
-Your extension package is ready! The ZIP file `functionhealth_extension_v2.0.1.zip` contains everything needed for Chrome Web Store submission.
+Your extension package is ready! The ZIP file `personal_health_data_tool_v2.4.0.zip` contains everything needed for Chrome Web Store submission.
 ```

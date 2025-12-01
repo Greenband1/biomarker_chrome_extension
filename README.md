@@ -2,26 +2,29 @@
 
 A Chrome extension that extracts biomarker data from health services into exportable formats (CSV, JSON, table).
 
-![Extension Version](https://img.shields.io/badge/version-2.3.0-blue.svg)
+![Extension Version](https://img.shields.io/badge/version-2.4.0-blue.svg)
 ![Chrome Extension](https://img.shields.io/badge/platform-Chrome%20Extension-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-## 🚀 What's New (v2.3.0)
+## 🚀 What's New (v2.4.0)
 
-### Visual View Enhancements
-- **Interactive Trend Lines** - Hover over data points on sparklines to see values and dates
-- **Improved Threshold Visualizations** - Added trend lines for threshold-type biomarkers (hs-CRP, etc.)
-- **Fixed Titer Visualization** - Data labels no longer overlap with axis scales
-- **Consistent UI** - Progress narrative boxes now have uniform height
+### Complete UI Redesign - Health-Focused Identity
+- **New Color Palette** - Replaced generic purple gradient with calming medical/wellness aesthetic (soft teals, warm neutrals, terracotta accents)
+- **Premium Typography** - DM Sans font family for a distinctive, professional look
+- **Custom SVG Icons** - Replaced all emoji icons with cohesive SVG icon set matching the visual overlay style
+- **Micro-Interactions** - Button ripple effects and smooth animations for polished feel
+- **Refined Notifications** - Bottom toast-style notifications with smart timing (less intrusive, more informative)
 
-### Data Parsing Improvements  
-- **API Category Support** - Uses category information directly from Function Health API (e.g., "Nutrients")
-- **Smart Biomarker Grouping** - Automatically merges name variations like "Omega 3 Total" and "Omega-3 Total / OmegaCheck"
-- **Duplicate Elimination** - Removes duplicate test results with same date/value
-- **Date Normalization** - Consistent date handling across all filters and displays
+### UX Improvements
+- **Cleaner Layout** - Warm cream background with refined shadows and spacing
+- **Streamlined Flow** - Removed verbose validation messages; button loading state provides feedback
+- **Consistent Styling** - All components now share a unified visual language with the visual overlay
 
-### New Categories
-- Added support for **Nutrients**, **Electrolytes**, **Urinalysis**, and **Inflammation** categories with icons
+### Previous Features (v2.3.0)
+- Interactive trend lines in Visual View
+- API category support from Function Health
+- Smart biomarker grouping and duplicate elimination
+- Support for Nutrients, Electrolytes, Urinalysis, and Inflammation categories
 
 ## ⚠️ Legal Disclaimer
 
@@ -40,7 +43,7 @@ This extension is an independent tool created to help users export their own bio
 - **🎨 Progressive Interface** - Export options appear after extraction for clean workflow
 - **🔄 Auto-Navigation** - Automatically navigates to correct page
 - **💾 Session Filters** - Filter preferences persist during your session
-- **✨ Professional Design** - Modern interface with clear visual hierarchy
+- **✨ Premium Design** - Health-focused UI with DM Sans typography, custom SVG icons, and refined micro-interactions
 
 ## 🚀 Installation
 

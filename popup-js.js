@@ -247,18 +247,65 @@ async function verifyContentScript(tabId) {
 }
 
 /**
- * @description Show a temporary notification
+ * @description SVG icons for notification types
+ */
+const NOTIFICATION_ICONS = {
+    success: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+        <polyline points="22 4 12 14.01 9 11.01"/>
+    </svg>`,
+    error: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="15" y1="9" x2="9" y2="15"/>
+        <line x1="9" y1="9" x2="15" y2="15"/>
+    </svg>`,
+    warning: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/>
+        <line x1="12" y1="17" x2="12.01" y2="17"/>
+    </svg>`,
+    info: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="16" x2="12" y2="12"/>
+        <line x1="12" y1="8" x2="12.01" y2="8"/>
+    </svg>`
+};
+
+// Track current notification for replacement behavior
+let currentNotificationTimeout = null;
+
+/**
+ * @description Show a temporary notification (toast style)
  * @param {string} message - The notification message
  * @param {string} type - Notification type: 'success', 'error', 'info', 'warning'
- * @param {number} duration - Duration in milliseconds (default: 2000 for success/info, 3000 for error/warning)
+ * @param {number} duration - Duration in milliseconds
  */
 function showNotification(message, type = 'info', duration = null) {
     const container = document.getElementById('notificationContainer');
     
+    // Remove emoji prefixes from message (we use SVG icons now)
+    const cleanMessage = message.replace(/^[⚡📥📋✅❌⚠️🔄🚀ℹ️🔧📊📅]\s*/u, '');
+    
+    // Clear existing notifications for stack behavior (latest replaces previous)
+    if (currentNotificationTimeout) {
+        clearTimeout(currentNotificationTimeout);
+    }
+    container.innerHTML = '';
+    
     // Create notification element
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
-    notification.textContent = message;
+    
+    // Add icon
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'notification-icon';
+    iconSpan.innerHTML = NOTIFICATION_ICONS[type] || NOTIFICATION_ICONS.info;
+    notification.appendChild(iconSpan);
+    
+    // Add message text
+    const textSpan = document.createElement('span');
+    textSpan.textContent = cleanMessage;
+    notification.appendChild(textSpan);
     
     // Add to container
     container.appendChild(notification);
@@ -268,17 +315,24 @@ function showNotification(message, type = 'info', duration = null) {
         notification.classList.add('show');
     });
     
-    // Set duration based on type (extended by 1.5 seconds)
-    const autoHideDuration = duration || (type === 'error' || type === 'warning' ? 4500 : 3500);
+    // Set duration based on type (refined for better UX)
+    const durations = {
+        success: 2500,  // Brief acknowledgment
+        info: 2000,     // Transient
+        warning: 3500,  // Needs attention
+        error: 4000     // Needs reading
+    };
+    const autoHideDuration = duration || durations[type] || 2500;
     
     // Auto-remove notification
-        setTimeout(() => {
+    currentNotificationTimeout = setTimeout(() => {
         notification.classList.remove('show');
         setTimeout(() => {
             if (notification.parentNode) {
                 container.removeChild(notification);
             }
         }, 300); // Wait for fade out animation
+        currentNotificationTimeout = null;
     }, autoHideDuration);
 }
 
@@ -371,8 +425,7 @@ async function extractMyBiomarkers() {
             extractionScope: scope 
         });
         
-        showNotification('⚡ Validating page and login status...', 'info');
-        
+        // Silent validation - button loading state provides feedback
         const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
         
         // Validate page and login status
@@ -383,7 +436,7 @@ async function extractMyBiomarkers() {
             
             // Handle different validation scenarios
             if (validation.shouldExit) {
-                handlePopupExit('❌ ' + validation.message);
+                handlePopupExit(validation.message);
                 return;
             }
             
@@ -393,18 +446,18 @@ async function extractMyBiomarkers() {
             }
             
             // For login errors, show message and instructions
-            showNotification('❌ ' + validation.message, 'error');
+            showNotification(validation.message, 'error');
             if (validation.instructions) {
                 setTimeout(() => {
-                    showNotification('⚠️ ' + validation.instructions, 'warning');
+                    showNotification(validation.instructions, 'warning');
                 }, 2000);
             }
             
             return;
         }
         
-        const extractionType = scope === 'current' ? 'current results' : 'historical data';
-        showNotification(`🚀 Extracting ${extractionType}...`, 'info');
+        // Show brief extraction notification
+        showNotification('Extracting your biomarkers...', 'info');
 
         // Verify content script is available
         const isContentScriptReady = await verifyContentScript(tab.id);

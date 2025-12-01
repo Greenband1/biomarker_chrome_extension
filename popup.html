@@ -4,125 +4,268 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Function Health Data Extractor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        /* ========================================
+           CSS Custom Properties - Health Palette
+           ======================================== */
+        :root {
+            /* Primary Colors */
+            --color-primary: #30c48d;
+            --color-primary-dark: #1a8f66;
+            --color-primary-light: #e8f8f2;
+            
+            /* Accent Colors */
+            --color-accent: #e07a5f;
+            --color-accent-light: #fdf0ed;
+            
+            /* Neutral Colors */
+            --color-background: #faf8f5;
+            --color-surface: #ffffff;
+            --color-border: #e8e4df;
+            --color-border-light: #f0ece7;
+            
+            /* Text Colors */
+            --color-text-primary: #2d3142;
+            --color-text-secondary: #6c717f;
+            --color-text-muted: #9ca3af;
+            
+            /* Status Colors */
+            --color-success: #30c48d;
+            --color-success-bg: #e8f8f2;
+            --color-warning: #f7b267;
+            --color-warning-bg: #fef8f0;
+            --color-error: #f77070;
+            --color-error-bg: #fef0f0;
+            --color-info: #5b9fd4;
+            --color-info-bg: #eef6fc;
+            
+            /* Shadows */
+            --shadow-sm: 0 2px 8px rgba(45, 49, 66, 0.08);
+            --shadow-md: 0 4px 16px rgba(45, 49, 66, 0.1);
+            --shadow-lg: 0 8px 32px rgba(45, 49, 66, 0.12);
+            --shadow-primary: 0 6px 24px rgba(48, 196, 141, 0.35);
+            --shadow-primary-hover: 0 8px 32px rgba(48, 196, 141, 0.45);
+            
+            /* Transitions */
+            --transition-fast: 0.15s ease;
+            --transition-base: 0.25s ease;
+            --transition-slow: 0.4s ease;
+            
+            /* Border Radius */
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 16px;
+        }
+
+        /* ========================================
+           Base Styles
+           ======================================== */
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             width: 400px;
             min-height: 400px;
             max-height: 600px;
-            padding: 15px;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            padding: 16px;
+            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--color-background);
+            color: var(--color-text-primary);
             margin: 0;
+            line-height: 1.5;
         }
 
         .container {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 12px;
+            background: var(--color-surface);
+            border-radius: var(--radius-lg);
             padding: 20px;
-            color: #333;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            box-shadow: var(--shadow-lg);
+            position: relative;
         }
 
+        /* ========================================
+           SVG Icon Definitions
+           ======================================== */
+        .icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1em;
+            height: 1em;
+            vertical-align: -0.125em;
+        }
+
+        .icon svg {
+            width: 100%;
+            height: 100%;
+            fill: currentColor;
+        }
+
+        .icon-lg {
+            width: 1.25em;
+            height: 1.25em;
+        }
+
+        /* ========================================
+           Disclaimer Banner
+           ======================================== */
         .disclaimer {
-            background: rgba(255, 193, 7, 0.1);
-            color: #856404;
-            padding: 8px 12px;
-            border-radius: 6px;
-            border-left: 3px solid #ffc107;
-            margin-bottom: 12px;
+            background: var(--color-accent-light);
+            color: var(--color-text-secondary);
+            padding: 10px 12px;
+            border-radius: var(--radius-sm);
+            border-left: 3px solid var(--color-accent);
+            margin-bottom: 16px;
             font-size: 11px;
-            line-height: 1.3;
+            line-height: 1.4;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
         }
 
+        .disclaimer-icon {
+            flex-shrink: 0;
+            color: var(--color-accent);
+            margin-top: 1px;
+        }
+
+        .disclaimer strong {
+            color: var(--color-text-primary);
+        }
+
+        /* ========================================
+           Header
+           ======================================== */
         .header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
         }
 
         h1 {
-            font-size: 20px;
+            font-size: 18px;
+            font-weight: 700;
             margin: 0;
-            color: #667eea;
+            color: var(--color-text-primary);
             flex-grow: 1;
             text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .title-icon {
+            color: var(--color-primary);
+            font-size: 22px;
         }
 
         .help-button {
-            background: none;
+            background: var(--color-primary-light);
             border: none;
-            font-size: 18px;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
             cursor: pointer;
-            padding: 4px 8px;
-            border-radius: 4px;
-            transition: background-color 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--color-primary);
+            transition: all var(--transition-fast);
         }
 
         .help-button:hover {
-            background: rgba(102, 126, 234, 0.1);
+            background: var(--color-primary);
+            color: white;
+            transform: scale(1.05);
         }
 
-        .help-section {
-            margin-bottom: 15px;
-            padding: 16px;
-            background: rgba(102, 126, 234, 0.05);
-            border-radius: 8px;
-            border-left: 4px solid #667eea;
-            animation: slideDown 0.3s ease-out;
+        .help-button svg {
+            width: 16px;
+            height: 16px;
         }
 
-        .help-content h3 {
-            margin: 0 0 8px 0;
-            color: #667eea;
-            font-size: 14px;
+        /* ========================================
+           Close Button
+           ======================================== */
+        .close-button {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: var(--color-border-light);
+            border: none;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            cursor: pointer;
+            color: var(--color-text-muted);
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--transition-fast);
+            padding: 0;
+            line-height: 1;
         }
 
-        .help-content ol, .help-content ul {
-            margin: 0 0 12px 0;
-            padding-left: 20px;
+        .close-button:hover {
+            background: var(--color-border);
+            color: var(--color-text-secondary);
+            transform: scale(1.05);
         }
 
-        .help-content li {
-            font-size: 12px;
-            line-height: 1.4;
-            margin-bottom: 4px;
-        }
-
-        .help-content strong {
-            color: #495057;
-        }
-
-        /* Primary Action Zone */
+        /* ========================================
+           Primary Action Zone
+           ======================================== */
         .primary-action-zone {
-            margin-bottom: 24px;
+            margin-bottom: 20px;
         }
 
         .primary-button {
             width: 100%;
-            padding: 18px 24px;
-            font-size: 18px;
-            font-weight: 700;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 16px 24px;
+            font-size: 16px;
+            font-weight: 600;
+            font-family: inherit;
+            background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
             border: none;
-            border-radius: 12px;
+            border-radius: var(--radius-md);
             color: white;
             cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 6px 24px rgba(102, 126, 234, 0.4);
+            transition: all var(--transition-base);
+            box-shadow: var(--shadow-primary);
             position: relative;
             overflow: hidden;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
-            margin-bottom: 12px;
+            gap: 10px;
+        }
+
+        .primary-button::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at center, rgba(255,255,255,0.3) 0%, transparent 70%);
+            opacity: 0;
+            transform: scale(0);
+            transition: transform 0.5s ease, opacity 0.3s ease;
         }
 
         .primary-button:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 32px rgba(102, 126, 234, 0.5);
+            box-shadow: var(--shadow-primary-hover);
+        }
+
+        .primary-button:active::before {
+            transform: scale(2.5);
+            opacity: 1;
+            transition: 0s;
         }
 
         .primary-button:active {
@@ -136,35 +279,40 @@
         }
 
         .primary-button.loading .button-text {
-            opacity: 0.7;
+            opacity: 0.8;
         }
 
         .button-spinner {
             display: none;
+            width: 20px;
+            height: 20px;
+        }
+
+        .button-spinner svg {
             animation: spin 1s linear infinite;
         }
 
         .primary-button.loading .button-spinner {
-            display: inline-block;
+            display: flex;
         }
 
-
-        /* Export Zone */
+        /* ========================================
+           Export Zone
+           ======================================== */
         .export-zone {
-            border-top: 1px solid rgba(102, 126, 234, 0.15);
+            border-top: 1px solid var(--color-border);
             padding-top: 20px;
             margin-top: 20px;
             animation: slideDown 0.4s ease-out;
         }
-
 
         .export-section {
             margin-bottom: 16px;
         }
 
         .export-title {
-            font-size: 16px;
-            color: #667eea;
+            font-size: 14px;
+            color: var(--color-text-primary);
             margin: 0 0 12px 0;
             font-weight: 600;
         }
@@ -177,57 +325,42 @@
 
         .export-button {
             flex: 1;
-            min-width: 100px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 10px 16px;
-            border-radius: 8px;
+            min-width: 90px;
+            background: var(--color-surface);
+            color: var(--color-primary-dark);
+            border: 2px solid var(--color-primary);
+            padding: 10px 14px;
+            border-radius: var(--radius-sm);
             cursor: pointer;
             font-size: 13px;
             font-weight: 600;
-            transition: all 0.3s ease;
-            box-shadow: 0 3px 12px rgba(102, 126, 234, 0.3);
+            font-family: inherit;
+            transition: all var(--transition-fast);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
         }
 
         .export-button:hover {
+            background: var(--color-primary);
+            color: white;
             transform: translateY(-1px);
-            box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
+            box-shadow: var(--shadow-sm);
         }
 
         .export-button:active {
             transform: translateY(0);
         }
 
-        .advanced-toggle {
-            width: 100%;
-            background: rgba(102, 126, 234, 0.1);
-            color: #667eea;
-            border: 2px solid rgba(102, 126, 234, 0.2);
-            padding: 12px 16px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            transition: all 0.3s ease;
+        .export-button svg {
+            width: 14px;
+            height: 14px;
         }
 
-        .advanced-toggle:hover {
-            background: rgba(102, 126, 234, 0.15);
-            border-color: rgba(102, 126, 234, 0.3);
-        }
-
-        .advanced-toggle.applied {
-            background: rgba(40, 167, 69, 0.1);
-            border-color: #28a745;
-            color: #28a745;
-        }
-
-        .advanced-toggle.applied:hover {
-            background: rgba(40, 167, 69, 0.15);
-            border-color: #218838;
-        }
-
+        /* ========================================
+           Advanced Toggle Buttons
+           ======================================== */
         .advanced-actions {
             display: flex;
             gap: 8px;
@@ -235,17 +368,52 @@
             flex-wrap: wrap;
         }
 
-        .advanced-actions .advanced-toggle {
-            flex: 1 1 160px;
-            word-break: break-word;
+        .advanced-toggle {
+            flex: 1 1 140px;
+            background: var(--color-border-light);
+            color: var(--color-text-secondary);
+            border: 1px solid var(--color-border);
+            padding: 10px 14px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            font-family: inherit;
+            transition: all var(--transition-fast);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
         }
 
-        /* Advanced Filters */
+        .advanced-toggle:hover {
+            background: var(--color-border);
+            border-color: var(--color-text-muted);
+        }
+
+        .advanced-toggle.applied {
+            background: var(--color-success-bg);
+            border-color: var(--color-success);
+            color: var(--color-primary-dark);
+        }
+
+        .advanced-toggle.applied:hover {
+            background: var(--color-primary-light);
+        }
+
+        .advanced-toggle svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        /* ========================================
+           Advanced Filters Section
+           ======================================== */
         .advanced-filters {
             max-height: 0;
             overflow: hidden;
-            transition: max-height 0.4s ease-out;
-            border-top: 1px solid rgba(102, 126, 234, 0.15);
+            transition: max-height var(--transition-slow);
+            border-top: 1px solid var(--color-border);
             margin-top: 16px;
         }
 
@@ -263,288 +431,308 @@
 
         .advanced-header h3 {
             margin: 0;
-            color: #667eea;
-            font-size: 16px;
+            color: var(--color-text-primary);
+            font-size: 15px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .advanced-header h3 svg {
+            width: 16px;
+            height: 16px;
+            color: var(--color-primary);
         }
 
         .close-advanced {
-            background: none;
+            background: var(--color-border-light);
             border: none;
-            font-size: 20px;
-            color: #6c757d;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            color: var(--color-text-muted);
             cursor: pointer;
-            padding: 4px 8px;
-            border-radius: 4px;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--transition-fast);
         }
 
         .close-advanced:hover {
-            background: rgba(108, 117, 125, 0.1);
+            background: var(--color-border);
+            color: var(--color-text-secondary);
         }
 
-        /* Legacy button styles for filters */
-        button {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 12px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-
-        button:hover {
-            transform: translateY(-1px);
-        }
-
-        button:active {
-            transform: translateY(0);
-        }
-
-        #status {
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            font-size: 14px;
-            text-align: center;
-            font-weight: 500;
-            min-height: 20px;
-            transition: all 0.3s ease;
-        }
-
-        #status.success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-
-        #status.error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-
-        #status.info {
-            background: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-        }
-
-        #status.warning {
-            background: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeaa7;
-        }
-
-        #dataPreview {
-            max-height: 200px;
-            overflow-y: auto;
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 10px;
-            font-size: 12px;
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-            display: none;
-            margin-top: 15px;
-        }
-
-        #dataPreview.show {
-            display: block;
-        }
-
-        .stats {
-            display: flex;
-            justify-content: space-around;
-            margin: 15px 0;
-            padding: 10px;
-            background: #f8f9fa;
-            border-radius: 8px;
-        }
-
-        .stat-item {
-            text-align: center;
-        }
-
-        .stat-value {
-            font-size: 24px;
-            font-weight: bold;
-            color: #667eea;
-        }
-
-        .stat-label {
-            font-size: 12px;
-            color: #6c757d;
-            margin-top: 5px;
-        }
-
-        .instructions {
-            font-size: 12px;
-            color: #6c757d;
-            margin-top: 15px;
-            padding: 10px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            line-height: 1.5;
-        }
-
-        .loader {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(102, 126, 234, 0.3);
-            border-radius: 50%;
-            border-top-color: #667eea;
-            animation: spin 1s ease-in-out infinite;
-        }
-
-        .progress-bar-container {
-            width: 100%;
-            background-color: #e0e0e0;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            display: none;
-        }
-
-        .progress-bar {
-            width: 0%;
-            height: 20px;
-            background-color: #667eea;
-            border-radius: 8px;
-            text-align: center;
-            line-height: 20px;
-            color: white;
-            transition: width 0.3s ease-in-out;
-        }
-
-        .close-button {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: none;
-            border: none;
-            font-size: 20px;
-            cursor: pointer;
-            color: #aaa;
-        }
-
-        .version {
-            font-size: 10px;
-            color: #aaa;
-            text-align: center;
-            margin-top: 15px;
-        }
-
-        /* Filter page styles */
-        .filter-page {
-            display: none;
-        }
-
-        .filter-page.active {
-            display: block;
-        }
-
-        .main-page.hidden {
-            display: none;
-        }
-
-        .back-button {
-            background: #6c757d;
-            margin-bottom: 15px;
-        }
-
-        .back-button:hover {
-            background: #5a6268;
-        }
-
+        /* ========================================
+           Filter Groups
+           ======================================== */
         .filter-group {
-            margin-bottom: 20px;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
+            margin-bottom: 16px;
+            padding: 14px;
+            background: var(--color-background);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--color-border-light);
         }
 
-        .filter-group h3 {
+        .filter-group h4 {
             margin: 0 0 10px 0;
-            color: #667eea;
-            font-size: 16px;
+            color: var(--color-text-primary);
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .filter-group h4 svg {
+            width: 14px;
+            height: 14px;
+            color: var(--color-primary);
+        }
+
+        .select-all-buttons {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+
+        .select-button,
+        .latest-only-button {
+            flex: 1;
+            padding: 6px 10px;
+            font-size: 11px;
+            font-weight: 500;
+            font-family: inherit;
+            background: var(--color-surface);
+            color: var(--color-text-secondary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .select-button:hover,
+        .latest-only-button:hover {
+            background: var(--color-border-light);
+            border-color: var(--color-text-muted);
+        }
+
+        .latest-only-button.active {
+            background: var(--color-primary);
+            color: white;
+            border-color: var(--color-primary);
         }
 
         .date-checkboxes {
-            max-height: 120px;
+            max-height: 110px;
             overflow-y: auto;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
             padding: 8px;
-            background: white;
+            background: var(--color-surface);
+        }
+
+        .date-checkboxes.disabled {
+            opacity: 0.5;
+            pointer-events: none;
         }
 
         .checkbox-item {
             display: flex;
             align-items: center;
             padding: 4px 0;
+            font-size: 12px;
+            color: var(--color-text-primary);
         }
 
         .checkbox-item input[type="checkbox"] {
             margin-right: 8px;
+            accent-color: var(--color-primary);
         }
 
-
-        .select-all-buttons {
+        /* ========================================
+           Stats Section
+           ======================================== */
+        .stats {
             display: flex;
-            gap: 5px;
-            margin-bottom: 8px;
+            justify-content: space-around;
+            margin: 16px 0;
+            padding: 14px;
+            background: var(--color-background);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--color-border-light);
         }
 
-        .select-all-buttons button {
-            flex: 1;
-            padding: 4px 8px;
-            font-size: 12px;
-            background: #e9ecef;
-            color: #495057;
+        .stat-item {
+            text-align: center;
+            position: relative;
         }
 
-        .select-all-buttons button:hover {
-            background: #dee2e6;
+        .stat-item:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            right: -20px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 1px;
+            height: 30px;
+            background: var(--color-border);
         }
 
-        .export-note {
+        .stat-value {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--color-primary);
+        }
+
+        .stat-label {
             font-size: 11px;
-            color: #6c757d;
-            font-style: italic;
-            margin-bottom: 15px;
-            padding: 8px;
-            background: rgba(102, 126, 234, 0.08);
-            border-radius: 4px;
-            border-left: 3px solid #667eea;
+            color: var(--color-text-secondary);
+            margin-top: 4px;
+            font-weight: 500;
         }
 
-        /* Notification System */
+        /* ========================================
+           Help Section
+           ======================================== */
+        .help-section {
+            margin-bottom: 15px;
+            padding: 16px;
+            background: var(--color-background);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--color-border-light);
+            animation: slideDown 0.3s ease-out;
+        }
+
+        .help-content h3 {
+            margin: 0 0 10px 0;
+            color: var(--color-text-primary);
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .help-content h3 svg {
+            width: 14px;
+            height: 14px;
+            color: var(--color-primary);
+        }
+
+        .help-content ol, .help-content ul {
+            margin: 0 0 14px 0;
+            padding-left: 20px;
+        }
+
+        .help-content li {
+            font-size: 12px;
+            line-height: 1.5;
+            margin-bottom: 4px;
+            color: var(--color-text-secondary);
+        }
+
+        .help-content strong {
+            color: var(--color-text-primary);
+            font-weight: 600;
+        }
+
+        .help-content p {
+            font-size: 12px;
+            line-height: 1.5;
+            color: var(--color-text-secondary);
+            margin: 0 0 14px 0;
+        }
+
+        /* ========================================
+           Version Footer
+           ======================================== */
+        .version {
+            font-size: 10px;
+            color: var(--color-text-muted);
+            text-align: center;
+            margin-top: 16px;
+        }
+
+        /* ========================================
+           Data Preview
+           ======================================== */
+        #dataPreview {
+            max-height: 200px;
+            overflow-y: auto;
+            background: var(--color-background);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            font-size: 11px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            display: none;
+            margin-top: 15px;
+            color: var(--color-text-secondary);
+        }
+
+        #dataPreview.show {
+            display: block;
+        }
+
+        /* ========================================
+           Progress Bar
+           ======================================== */
+        .progress-bar-container {
+            width: 100%;
+            background-color: var(--color-border);
+            border-radius: var(--radius-sm);
+            margin-bottom: 15px;
+            display: none;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            width: 0%;
+            height: 6px;
+            background: linear-gradient(90deg, var(--color-primary), var(--color-primary-dark));
+            border-radius: var(--radius-sm);
+            transition: width 0.3s ease-in-out;
+            position: relative;
+        }
+
+        .progress-bar::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            animation: shimmer 1.5s infinite;
+        }
+
+        /* ========================================
+           Notification System (Toast Style)
+           ======================================== */
         .notification-container {
             position: fixed;
-            top: 50%;
+            bottom: 16px;
             left: 50%;
-            transform: translate(-50%, -50%);
+            transform: translateX(-50%);
             z-index: 10000;
             pointer-events: none;
-            max-width: 320px;
-            width: 90%;
+            max-width: 340px;
+            width: calc(100% - 32px);
         }
 
         .notification {
-            background: rgba(255, 255, 255, 0.98);
-            border-radius: 8px;
+            background: var(--color-surface);
+            border-radius: var(--radius-md);
             padding: 12px 16px;
-            margin-bottom: 8px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            backdrop-filter: blur(10px);
-            font-size: 14px;
+            margin-top: 8px;
+            box-shadow: var(--shadow-lg);
+            font-size: 13px;
             font-weight: 500;
-            text-align: center;
+            display: flex;
+            align-items: center;
+            gap: 10px;
             opacity: 0;
-            transform: translateY(-20px) scale(0.95);
+            transform: translateY(20px) scale(0.95);
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             pointer-events: auto;
         }
@@ -554,30 +742,60 @@
             transform: translateY(0) scale(1);
         }
 
+        .notification-icon {
+            flex-shrink: 0;
+            width: 20px;
+            height: 20px;
+        }
+
+        .notification-icon svg {
+            width: 100%;
+            height: 100%;
+        }
+
         .notification.success {
-            color: #155724;
-            border-left: 4px solid #28a745;
-            background: rgba(212, 237, 218, 0.95);
+            color: var(--color-primary-dark);
+            border-left: 4px solid var(--color-success);
+            background: var(--color-success-bg);
+        }
+
+        .notification.success .notification-icon {
+            color: var(--color-success);
         }
 
         .notification.error {
-            color: #721c24;
-            border-left: 4px solid #dc3545;
-            background: rgba(248, 215, 218, 0.95);
+            color: #8b2635;
+            border-left: 4px solid var(--color-error);
+            background: var(--color-error-bg);
+        }
+
+        .notification.error .notification-icon {
+            color: var(--color-error);
         }
 
         .notification.info {
-            color: #0c5460;
-            border-left: 4px solid #17a2b8;
-            background: rgba(209, 236, 241, 0.95);
+            color: #1e5a7a;
+            border-left: 4px solid var(--color-info);
+            background: var(--color-info-bg);
+        }
+
+        .notification.info .notification-icon {
+            color: var(--color-info);
         }
 
         .notification.warning {
-            color: #856404;
-            border-left: 4px solid #ffc107;
-            background: rgba(255, 243, 205, 0.95);
+            color: #7a5a1e;
+            border-left: 4px solid var(--color-warning);
+            background: var(--color-warning-bg);
         }
 
+        .notification.warning .notification-icon {
+            color: var(--color-warning);
+        }
+
+        /* ========================================
+           Animations
+           ======================================== */
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
@@ -593,112 +811,129 @@
             }
         }
 
-        /* Filter-specific styles */
-        .filter-group {
-            margin-bottom: 20px;
-            padding: 12px;
-            background: #f8f9fa;
-            border-radius: 8px;
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
         }
 
-        .filter-group h4 {
-            margin: 0 0 8px 0;
-            color: #667eea;
-            font-size: 14px;
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
 
-        .select-all-buttons {
-            display: flex;
-            gap: 6px;
-            margin-bottom: 8px;
-        }
-
-        .select-button {
-            flex: 1;
-            padding: 4px 8px;
-            font-size: 11px;
-            background: #e9ecef;
-            color: #495057;
-        }
-
-        .select-button:hover {
-            background: #dee2e6;
-        }
-
-        .latest-only-button {
-            flex: 1;
-            padding: 4px 8px;
-            font-size: 11px;
-            background: #e9ecef;
-            color: #495057;
-            border: 1px solid #ced4da;
-            transition: all 0.3s ease;
-        }
-
-        .latest-only-button:hover {
-            background: #dee2e6;
-        }
-
-        .latest-only-button.active {
-            background: #667eea;
-            color: white;
-            border-color: #667eea;
-        }
-
-        .date-checkboxes.disabled {
-            opacity: 0.5;
-            pointer-events: none;
-        }
-
-        .date-checkboxes.disabled .checkbox-item {
-            color: #6c757d;
-        }
-
-        .filter-actions {
-            margin-top: 16px;
-            padding-top: 16px;
-            border-top: 1px solid rgba(102, 126, 234, 0.15);
+        /* ========================================
+           Loader
+           ======================================== */
+        .loader {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--color-primary-light);
+            border-radius: 50%;
+            border-top-color: var(--color-primary);
+            animation: spin 0.8s ease-in-out infinite;
         }
 
     </style>
 </head>
 <body>
     <div class="container">
-        <button id="closeButton" class="close-button">&times;</button>
+        <button id="closeButton" class="close-button" aria-label="Close">&times;</button>
+        
         <div class="disclaimer">
-            <strong>⚠️ Disclaimer:</strong> Unofficial tool for personal use only. Not affiliated with or endorsed by any health service provider. Users must comply with all website Terms of Service.
+            <span class="disclaimer-icon">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/>
+                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+            </span>
+            <span><strong>Disclaimer:</strong> Unofficial tool for personal use only. Not affiliated with or endorsed by any health service provider. Users must comply with all website Terms of Service.</span>
         </div>
         
         <div class="header">
-            <h1>🩺 Personal Health Data Tool</h1>
-            <button id="helpButton" class="help-button" title="Help & Instructions">ℹ️</button>
+            <h1>
+                <span class="title-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                    </svg>
+                </span>
+                Personal Health Data Tool
+            </h1>
+            <button id="helpButton" class="help-button" title="Help & Instructions">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+            </button>
         </div>
         
         <!-- Primary Action Zone -->
         <div class="primary-action-zone">
             <button id="extractButton" class="primary-button">
                 <span class="button-text">Extract My Biomarkers</span>
-                <span class="button-spinner" style="display: none;">⚡</span>
+                <span class="button-spinner">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                    </svg>
+                </span>
             </button>
         </div>
 
         <!-- Export Zone (hidden initially) -->
         <div class="export-zone" id="exportZone" style="display: none;">
             <div class="export-section">
-                <h3 class="export-title">Export Your Data:</h3>
+                <h3 class="export-title">Export Your Data</h3>
                 <div class="export-buttons">
-                    <button id="exportCSV" class="export-button">Download CSV</button>
-                    <button id="exportJSON" class="export-button">Download JSON</button>
-                    <button id="exportCopy" class="export-button">📋 Copy</button>
+                    <button id="exportCSV" class="export-button">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        CSV
+                    </button>
+                    <button id="exportJSON" class="export-button">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        JSON
+                    </button>
+                    <button id="exportCopy" class="export-button">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                        </svg>
+                        Copy
+                    </button>
                 </div>
             </div>
 
             <div class="advanced-actions">
                 <button class="advanced-toggle" id="advancedToggle">
-                    🔧 Advanced Filters
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="4" y1="21" x2="4" y2="14"/>
+                        <line x1="4" y1="10" x2="4" y2="3"/>
+                        <line x1="12" y1="21" x2="12" y2="12"/>
+                        <line x1="12" y1="8" x2="12" y2="3"/>
+                        <line x1="20" y1="21" x2="20" y2="16"/>
+                        <line x1="20" y1="12" x2="20" y2="3"/>
+                        <line x1="1" y1="14" x2="7" y2="14"/>
+                        <line x1="9" y1="8" x2="15" y2="8"/>
+                        <line x1="17" y1="16" x2="23" y2="16"/>
+                    </svg>
+                    Advanced Filters
                 </button>
                 <button class="advanced-toggle" id="visualViewButton">
-                    📊 Visually View Results
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="20" x2="18" y2="10"/>
+                        <line x1="12" y1="20" x2="12" y2="4"/>
+                        <line x1="6" y1="20" x2="6" y2="14"/>
+                    </svg>
+                    Visual View
                 </button>
             </div>
         </div>
@@ -706,12 +941,26 @@
         <!-- Advanced Filters (expandable) -->
         <div class="advanced-filters" id="advancedFilters">
             <div class="advanced-header">
-                <h3>🔍 Filter Your Data</h3>
-                <button class="close-advanced" id="closeAdvanced">×</button>
+                <h3>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"/>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                    Filter Your Data
+                </h3>
+                <button class="close-advanced" id="closeAdvanced" aria-label="Close filters">&times;</button>
             </div>
             
             <div class="filter-group">
-                <h4>📅 Select Test Dates</h4>
+                <h4>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                        <line x1="16" y1="2" x2="16" y2="6"/>
+                        <line x1="8" y1="2" x2="8" y2="6"/>
+                        <line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                    Select Test Dates
+                </h4>
                 <div class="select-all-buttons">
                     <button id="latestOnlyToggle" class="latest-only-button">Latest Only</button>
                     <button id="selectAllDates" class="select-button">Select All</button>
@@ -723,7 +972,14 @@
             </div>
             
             <div class="filter-group">
-                <h4>📊 Select Categories</h4>
+                <h4>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="20" x2="18" y2="10"/>
+                        <line x1="12" y1="20" x2="12" y2="4"/>
+                        <line x1="6" y1="20" x2="6" y2="14"/>
+                    </svg>
+                    Select Categories
+                </h4>
                 <div class="select-all-buttons">
                     <button id="selectAllCategories" class="select-button">Select All</button>
                     <button id="selectNoCategories" class="select-button">Select None</button>
@@ -732,7 +988,6 @@
                     <!-- Category checkboxes will be populated dynamically -->
                 </div>
             </div>
-            
         </div>
         
 
@@ -756,7 +1011,16 @@
         <!-- Help Section (hidden by default) -->
         <div class="help-section" id="helpSection" style="display: none;">
             <div class="help-content">
-                <h3>📋 How to Use</h3>
+                <h3>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                        <polyline points="10 9 9 9 8 9"/>
+                    </svg>
+                    How to Use
+                </h3>
                 <ol>
                     <li><strong>Navigate</strong> to your health service biomarkers page</li>
                     <li><strong>Click "Extract My Biomarkers"</strong> to get all your historical data</li>
@@ -764,7 +1028,20 @@
                     <li><strong>Use "Advanced Filters"</strong> to customize your data export</li>
                 </ol>
                 
-                <h3>🔧 Advanced Filtering</h3>
+                <h3>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="4" y1="21" x2="4" y2="14"/>
+                        <line x1="4" y1="10" x2="4" y2="3"/>
+                        <line x1="12" y1="21" x2="12" y2="12"/>
+                        <line x1="12" y1="8" x2="12" y2="3"/>
+                        <line x1="20" y1="21" x2="20" y2="16"/>
+                        <line x1="20" y1="12" x2="20" y2="3"/>
+                        <line x1="1" y1="14" x2="7" y2="14"/>
+                        <line x1="9" y1="8" x2="15" y2="8"/>
+                        <line x1="17" y1="16" x2="23" y2="16"/>
+                    </svg>
+                    Advanced Filtering
+                </h3>
                 <ul>
                     <li><strong>Latest Only:</strong> Get most recent result for each biomarker</li>
                     <li><strong>Date Selection:</strong> Choose specific test dates to include</li>
@@ -773,10 +1050,24 @@
                     <li><strong>Session Filters:</strong> Filter settings reset when popup closes</li>
                 </ul>
                 
-                <h3>⚠️ Usage Warning</h3>
+                <h3>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                        <line x1="12" y1="9" x2="12" y2="13"/>
+                        <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                    Usage Warning
+                </h3>
                 <p><strong>This tool accesses your personal data via manual activation. Do not share or distribute results. Use is subject to the website's Terms of Service.</strong></p>
                 
-                <h3>💡 Tips & Features</h3>
+                <h3>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="16" x2="12" y2="12"/>
+                        <line x1="12" y1="8" x2="12.01" y2="8"/>
+                    </svg>
+                    Tips & Features
+                </h3>
                 <ul>
                     <li><strong>Auto-Navigation:</strong> Extension navigates to correct page automatically</li>
                     <li><strong>Multiple Formats:</strong> CSV for spreadsheets, JSON for developers</li>
@@ -784,7 +1075,14 @@
                     <li><strong>Extended Notifications:</strong> Messages stay visible longer for easier reading</li>
                 </ul>
                 
-                <h3>❓ Troubleshooting</h3>
+                <h3>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                        <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                    Troubleshooting
+                </h3>
                 <ul>
                     <li>Make sure you're logged into your health service account</li>
                     <li>Extension only works on supported health service domains</li>
