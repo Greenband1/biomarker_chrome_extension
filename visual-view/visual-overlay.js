@@ -2525,9 +2525,10 @@ function createMiniSparkline(events, refData) {
         return container;
     }
     
-    const width = 200;
-    const height = 40;
-    const padding = 4;
+    // Increased dimensions for better visibility
+    const width = 300;
+    const height = 60;
+    const padding = 8;
     
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
@@ -2558,15 +2559,16 @@ function createMiniSparkline(events, refData) {
         svg.appendChild(bandRect);
     }
     
-    // Draw line
+    // Draw line with increased stroke width
     if (points.length > 1) {
         const pathData = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         path.setAttribute('d', pathData);
         path.setAttribute('fill', 'none');
         path.setAttribute('stroke', '#667eea');
-        path.setAttribute('stroke-width', '1.5');
+        path.setAttribute('stroke-width', '2.5');
         path.setAttribute('stroke-linecap', 'round');
+        path.setAttribute('stroke-linejoin', 'round');
         svg.appendChild(path);
     }
     
@@ -2576,17 +2578,28 @@ function createMiniSparkline(events, refData) {
     tooltip.style.display = 'none';
     container.appendChild(tooltip);
     
-    // Draw points with hover tooltips
+    // Draw points with larger hit areas for easier hover
     points.forEach((point, index) => {
+        // Invisible larger hit area circle for easier hover detection
+        const hitArea = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        hitArea.setAttribute('cx', point.x);
+        hitArea.setAttribute('cy', point.y);
+        hitArea.setAttribute('r', 15); // Large invisible hit area
+        hitArea.setAttribute('fill', 'transparent');
+        hitArea.setAttribute('cursor', 'pointer');
+        hitArea.classList.add('fh-mini-sparkline-hitarea');
+        
+        // Visible dot
         const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         circle.setAttribute('cx', point.x);
         circle.setAttribute('cy', point.y);
-        circle.setAttribute('r', 2.5);
+        circle.setAttribute('r', 4); // Larger visible dot
         circle.setAttribute('fill', STATUS_COLORS[point.event.status] || STATUS_COLORS.Unknown);
         circle.classList.add('fh-mini-sparkline-dot');
+        circle.style.pointerEvents = 'none'; // Let hit area handle events
         
-        // Hover events for tooltip
-        circle.addEventListener('mouseenter', (e) => {
+        // Hover events on the larger hit area
+        hitArea.addEventListener('mouseenter', (e) => {
             // Format value (remove units, just show number)
             const value = point.event.numericValue ?? point.event.value;
             const date = formatShortDate(point.event.date);
@@ -2601,17 +2614,18 @@ function createMiniSparkline(events, refData) {
             
             // Center tooltip on dot, position above
             tooltip.style.left = `${dotX}px`;
-            tooltip.style.bottom = `${svgRect.height + 4}px`;
+            tooltip.style.bottom = `${svgRect.height + 6}px`;
             
-            // Scale up the dot
+            // Scale up the visible dot
+            circle.setAttribute('r', 7);
+        });
+        
+        hitArea.addEventListener('mouseleave', () => {
+            tooltip.style.display = 'none';
             circle.setAttribute('r', 4);
         });
         
-        circle.addEventListener('mouseleave', () => {
-            tooltip.style.display = 'none';
-            circle.setAttribute('r', 2.5);
-        });
-        
+        svg.appendChild(hitArea);
         svg.appendChild(circle);
     });
     
@@ -4712,33 +4726,36 @@ function injectStyles() {
             border-radius: 6px;
         }
 
-        /* Mini Sparkline */
+        /* Mini Sparkline - Enlarged for better visibility */
         .fh-mini-sparkline-container {
-            margin-top: 8px;
+            margin-top: 12px;
             position: relative;
         }
 
         .fh-mini-sparkline {
             width: 100%;
-            max-width: 200px;
-            height: 40px;
+            max-width: 300px;
+            height: 60px;
         }
 
         .fh-mini-sparkline-dot {
-            cursor: pointer;
             transition: r 0.15s ease;
+        }
+
+        .fh-mini-sparkline-hitarea {
+            cursor: pointer;
         }
 
         .fh-mini-sparkline-tooltip {
             position: absolute;
             background: #fff;
             border: 1px solid #e2e8f0;
-            border-radius: 6px;
-            padding: 4px 8px;
-            font-size: 11px;
-            line-height: 1.3;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 13px;
+            line-height: 1.4;
             color: #4a5568;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
             pointer-events: none;
             z-index: 100;
             transform: translateX(-50%);
@@ -4748,11 +4765,12 @@ function injectStyles() {
         .fh-mini-sparkline-tooltip strong {
             color: #2d3748;
             font-weight: 600;
+            font-size: 14px;
         }
 
         .fh-mini-sparkline-tooltip span {
             color: #718096;
-            font-size: 10px;
+            font-size: 11px;
         }
 
         /* Direction Badge Variants */
