@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Personal Health Data Tool",
-  "version": "2.4.0",
+  "version": "2.3.0",
   "description": "Extract and export your biomarker data from Function Health into CSV, JSON, and table formats. Not affiliated with Function Health.",
   "permissions": [
     "activeTab",
@@ -35,28 +35,7 @@
     {
       "resources": [
         "final-api-extractor.js",
-        "visual-view/visual-overlay.js",
-        "visual-view/styles/overlay.css",
-        "visual-view/constants/index.js",
-        "visual-view/utils/dateUtils.js",
-        "visual-view/utils/formatters.js",
-        "visual-view/utils/statusHelpers.js",
-        "visual-view/utils/trendHelpers.js",
-        "visual-view/data/biomarkerInfo.js",
-        "visual-view/data/consolidation.js",
-        "visual-view/classification/classifier.js",
-        "visual-view/classification/referenceParser.js",
-        "visual-view/charts/Sparklines.js",
-        "visual-view/charts/RangeBarChart.js",
-        "visual-view/charts/ThresholdChart.js",
-        "visual-view/charts/TiterLadder.js",
-        "visual-view/charts/BinaryDisplay.js",
-        "visual-view/charts/PatternDisplay.js",
-        "visual-view/charts/CategoricalTimeline.js",
-        "visual-view/components/BiomarkerCard.js",
-        "visual-view/components/MetricsDashboard.js",
-        "visual-view/components/FilterDropdowns.js",
-        "visual-view/components/PrintReport.js"
+        "visual-view/visual-overlay.js"
       ],
       "matches": ["https://*.functionhealth.com/*"]
     }

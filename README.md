@@ -2,36 +2,26 @@
 
 A Chrome extension that extracts biomarker data from health services into exportable formats (CSV, JSON, table).
 
-![Extension Version](https://img.shields.io/badge/version-2.4.0-blue.svg)
+![Extension Version](https://img.shields.io/badge/version-2.3.0-blue.svg)
 ![Chrome Extension](https://img.shields.io/badge/platform-Chrome%20Extension-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-## 🚀 What's New (v2.4.0)
+## 🚀 What's New (v2.3.0)
 
-### Code Architecture Improvements
-- **Modular Architecture** - Visual overlay refactored from 4856 lines to 22 focused modules
-- **Separated CSS** - Styles moved to standalone `overlay.css` file (1240 lines)
-- **Component-Based Design** - Charts, utilities, and UI components are now independent modules
-- **Improved Maintainability** - Each module handles a single responsibility
+### Visual View Enhancements
+- **Interactive Trend Lines** - Hover over data points on sparklines to see values and dates
+- **Improved Threshold Visualizations** - Added trend lines for threshold-type biomarkers (hs-CRP, etc.)
+- **Fixed Titer Visualization** - Data labels no longer overlap with axis scales
+- **Consistent UI** - Progress narrative boxes now have uniform height
 
-### Module Structure
-```
-visual-view/
-├── visual-overlay.js       # Main controller (~640 lines)
-├── constants/              # Colors, icons, known biomarkers
-├── utils/                  # Date, formatting, status helpers
-├── data/                   # Biomarker info, consolidation
-├── classification/         # Biomarker type detection
-├── charts/                 # RangeBar, Threshold, Titer, Sparklines, etc.
-├── components/             # Card, Dashboard, Filters, PrintReport
-└── styles/                 # CSS styles
-```
+### Data Parsing Improvements  
+- **API Category Support** - Uses category information directly from Function Health API (e.g., "Nutrients")
+- **Smart Biomarker Grouping** - Automatically merges name variations like "Omega 3 Total" and "Omega-3 Total / OmegaCheck"
+- **Duplicate Elimination** - Removes duplicate test results with same date/value
+- **Date Normalization** - Consistent date handling across all filters and displays
 
-### Previous Enhancements (v2.3.0)
-- Interactive hover tooltips on trend lines
-- Improved threshold visualizations with trend lines
-- API category support and smart biomarker grouping
-- Fixed titer visualization label overlap
+### New Categories
+- Added support for **Nutrients**, **Electrolytes**, **Urinalysis**, and **Inflammation** categories with icons
 
 ## ⚠️ Legal Disclaimer
 
