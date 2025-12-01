@@ -2,15 +2,26 @@
 
 A Chrome extension that extracts biomarker data from health services into exportable formats (CSV, JSON, table).
 
-![Extension Version](https://img.shields.io/badge/version-2.2.2-blue.svg)
+![Extension Version](https://img.shields.io/badge/version-2.3.0-blue.svg)
 ![Chrome Extension](https://img.shields.io/badge/platform-Chrome%20Extension-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-## 🚀 What's New (v2.2.2)
+## 🚀 What's New (v2.3.0)
 
-- Improved login validation to support Function Health's updated layout and ensure extraction proceeds when session markers are present.
-- Cleaned the production bundle of temporary debugging hooks while archiving the network capture tool for future investigations.
-- Bumped release artifacts and Chrome metadata to v2.2.2.
+### Visual View Enhancements
+- **Interactive Trend Lines** - Hover over data points on sparklines to see values and dates
+- **Improved Threshold Visualizations** - Added trend lines for threshold-type biomarkers (hs-CRP, etc.)
+- **Fixed Titer Visualization** - Data labels no longer overlap with axis scales
+- **Consistent UI** - Progress narrative boxes now have uniform height
+
+### Data Parsing Improvements  
+- **API Category Support** - Uses category information directly from Function Health API (e.g., "Nutrients")
+- **Smart Biomarker Grouping** - Automatically merges name variations like "Omega 3 Total" and "Omega-3 Total / OmegaCheck"
+- **Duplicate Elimination** - Removes duplicate test results with same date/value
+- **Date Normalization** - Consistent date handling across all filters and displays
+
+### New Categories
+- Added support for **Nutrients**, **Electrolytes**, **Urinalysis**, and **Inflammation** categories with icons
 
 ## ⚠️ Legal Disclaimer
 
@@ -100,7 +111,9 @@ Infectious Disease,Herpes Simplex Virus 1,In Range,<0.90,,2025-07-25
 - Liver
 - Thyroid
 - Hormones
-- Nutrients & Vitamins
+- Nutrients
+- Electrolytes
+- Urinalysis
 - Infectious Disease
 - Inflammation
 - General

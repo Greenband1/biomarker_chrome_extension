@@ -6,6 +6,65 @@
 console.log('🚀 Final API Extractor loading...');
 
 /**
+ * Normalize date to YYYY-MM-DD format for consistent comparison
+ * Handles both "2025-07-23" and "2025-07-23T12:00:00+00:00" formats
+ */
+function normalizeDate(dateStr) {
+    if (!dateStr) return null;
+    const match = String(dateStr).match(/^(\d{4}-\d{2}-\d{2})/);
+    return match ? match[1] : dateStr;
+}
+
+/**
+ * Normalize biomarker name for grouping similar tests
+ * Handles variations like "Omega 3" vs "Omega-3", removes suffixes like "/ OmegaCheck"
+ */
+function normalizeBiomarkerName(name) {
+    if (!name) return '';
+    
+    let normalized = name.trim();
+    
+    // Remove common suffixes that indicate same test
+    normalized = normalized.replace(/\s*\/\s*OmegaCheck\s*$/i, '');
+    
+    // Normalize "Omega X" variations: "Omega 3" -> "Omega-3", "Omega 6" -> "Omega-6"
+    normalized = normalized.replace(/Omega\s+(\d)/gi, 'Omega-$1');
+    
+    // Normalize spacing around colons (e.g., "Omega-3: DHA" vs "Omega-3 : DHA")
+    normalized = normalized.replace(/\s*:\s*/g, ': ');
+    
+    // Trim any resulting whitespace
+    normalized = normalized.trim();
+    
+    return normalized;
+}
+
+/**
+ * Get the display name for a group of biomarkers (prefer shorter, cleaner name)
+ */
+function getBestDisplayName(names) {
+    if (!names || names.length === 0) return '';
+    if (names.length === 1) return names[0];
+    
+    // Sort by length (prefer shorter names) then alphabetically
+    const sorted = [...names].sort((a, b) => {
+        // Prefer names without "/ OmegaCheck" suffix
+        const aHasSuffix = a.includes('/ OmegaCheck');
+        const bHasSuffix = b.includes('/ OmegaCheck');
+        if (aHasSuffix && !bHasSuffix) return 1;
+        if (!aHasSuffix && bHasSuffix) return -1;
+        
+        // Then prefer shorter names
+        if (a.length !== b.length) return a.length - b.length;
+        
+        // Then alphabetically
+        return a.localeCompare(b);
+    });
+    
+    return sorted[0];
+}
+
+/**
  * Get the working authentication token
  */
 function getWorkingToken() {
@@ -144,14 +203,47 @@ function parseAPIResponse(rawData) {
                         biomarkerResultsCount: visit.biomarkerResults ? visit.biomarkerResults.length : 0
                     });
                     
+                    // Check if visit has biomarker entries with parent biomarker info (new API structure)
+                    if (visit.biomarkers && Array.isArray(visit.biomarkers)) {
+                        visit.biomarkers.forEach(entry => {
+                            // Extract category from parent biomarker object
+                            const apiCategory = entry.biomarker?.categories?.[0]?.categoryName || null;
+                            const biomarkerName = entry.biomarker?.name || '';
+                            
+                            if (entry.biomarkerResults && Array.isArray(entry.biomarkerResults)) {
+                                entry.biomarkerResults.forEach(result => {
+                                    allBiomarkerResults.push({
+                                        ...result,
+                                        // Use biomarker name from parent if result's name is empty
+                                        biomarkerName: result.biomarkerName || biomarkerName,
+                                        // Attach API-provided category
+                                        apiCategory: apiCategory,
+                                        visitDate: visit.visitDate,
+                                        visitId: visit.id
+                                    });
+                                });
+                            }
+                        });
+                    }
+                    
+                    // Also check for direct biomarkerResults (legacy/alternative structure)
                     if (visit.biomarkerResults && Array.isArray(visit.biomarkerResults)) {
                         visit.biomarkerResults.forEach(result => {
-                            // Add visit context to each biomarker result
-                            allBiomarkerResults.push({
-                                ...result,
-                                visitDate: visit.visitDate,
-                                visitId: visit.id
-                            });
+                            // Only add if not already added via biomarkers array
+                            const alreadyAdded = allBiomarkerResults.some(r => 
+                                r.id === result.id || 
+                                (r.biomarkerName === result.biomarkerName && 
+                                 r.dateOfService === result.dateOfService &&
+                                 r.testResult === result.testResult)
+                            );
+                            
+                            if (!alreadyAdded) {
+                                allBiomarkerResults.push({
+                                    ...result,
+                                    visitDate: visit.visitDate,
+                                    visitId: visit.id
+                                });
+                            }
                         });
                     }
                 });
@@ -166,13 +258,50 @@ function parseAPIResponse(rawData) {
         return data;
     }
 
-    // Process each biomarker result
-    allBiomarkerResults.forEach((result, index) => {
+    // Group results by NORMALIZED biomarker name to consolidate historical data
+    // This handles variations like "Omega 3 Total" vs "Omega-3 Total" vs "Omega 3 Total / OmegaCheck"
+    const biomarkerGroups = new Map();
+    
+    allBiomarkerResults.forEach(result => {
+        const originalName = result.biomarkerName?.trim();
+        if (!originalName) return;
+        
+        const normalizedName = normalizeBiomarkerName(originalName);
+        
+        if (!biomarkerGroups.has(normalizedName)) {
+            biomarkerGroups.set(normalizedName, { 
+                results: [], 
+                apiCategory: null,
+                originalNames: new Set() // Track all original name variations
+            });
+        }
+        const group = biomarkerGroups.get(normalizedName);
+        group.results.push(result);
+        group.originalNames.add(originalName);
+        
+        // Capture API category if available (use first one found)
+        if (!group.apiCategory && result.apiCategory) {
+            group.apiCategory = result.apiCategory;
+        }
+    });
+    
+    console.log(`📊 Found ${biomarkerGroups.size} unique biomarkers after normalization`);
+
+    // Process each unique biomarker with ALL its historical values
+    biomarkerGroups.forEach((group, normalizedName) => {
+        // Use the best display name from all variations
+        const displayName = getBestDisplayName([...group.originalNames]);
         try {
-            const biomarker = parseBiomarkerResult(result);
+            const biomarker = createConsolidatedBiomarker(group.results, displayName);
             if (biomarker) {
-                // Determine category based on biomarker name
-                const categoryName = getBiomarkerCategoryFromName(result.biomarkerName) || 'General';
+                // Use API-provided category if available, otherwise fall back to keyword matching
+                let categoryName = group.apiCategory;
+                if (!categoryName) {
+                    categoryName = getBiomarkerCategoryFromName(displayName) || 'General';
+                }
+                
+                // Store the category on the biomarker for reference
+                biomarker.category = categoryName;
                 
                 if (!data.categories[categoryName]) {
                     data.categories[categoryName] = {
@@ -193,9 +322,13 @@ function parseAPIResponse(rawData) {
                     data.summary.outOfRange++;
                     data.categories[categoryName].outOfRange++;
                 }
+                
+                if (group.apiCategory) {
+                    console.log(`📂 Categorized "${displayName}" as "${categoryName}" (from API)`);
+                }
             }
         } catch (error) {
-            console.warn(`⚠️ Error parsing biomarker result ${index}:`, error);
+            console.warn(`⚠️ Error processing biomarker "${displayName}":`, error);
         }
     });
 
@@ -210,7 +343,68 @@ function parseAPIResponse(rawData) {
 }
 
 /**
+ * Create a consolidated biomarker object from multiple results
+ * Combines all historical values into a single biomarker entry
+ */
+function createConsolidatedBiomarker(results, biomarkerName) {
+    if (!results || results.length === 0) {
+        return null;
+    }
+    
+    // Sort by date descending (most recent first)
+    results.sort((a, b) => 
+        new Date(b.dateOfService || b.visitDate || 0) - 
+        new Date(a.dateOfService || a.visitDate || 0)
+    );
+    
+    const mostRecent = results[0];
+    
+    // Build historical values from ALL results with normalized dates
+    const allHistoricalValues = results.map(r => ({
+        date: normalizeDate(r.dateOfService || r.visitDate),
+        value: r.testResult,
+        unit: r.measurementUnits || '',
+        status: r.testResultOutOfRange ? 'Out of Range' : 'In Range',
+        inRange: !r.testResultOutOfRange,
+        visitDate: normalizeDate(r.visitDate)
+    })).filter(h => h.date); // Only include entries with valid dates
+    
+    // Deduplicate historical values with same date and value
+    // This handles cases like "Omega 3 Total" and "Omega 3 Total / OmegaCheck" having identical entries
+    const seenKeys = new Set();
+    const historicalValues = allHistoricalValues.filter(h => {
+        const key = `${h.date}|${h.value}`;
+        if (seenKeys.has(key)) {
+            return false; // Skip duplicate
+        }
+        seenKeys.add(key);
+        return true;
+    });
+    
+    const duplicatesRemoved = allHistoricalValues.length - historicalValues.length;
+    if (duplicatesRemoved > 0) {
+        console.log(`🔄 Deduplicated ${duplicatesRemoved} duplicate entries for "${biomarkerName}"`);
+    }
+    
+    const biomarker = {
+        name: biomarkerName,
+        status: mostRecent.testResultOutOfRange ? 'Out of Range' : 'In Range',
+        value: mostRecent.testResult || '',
+        unit: mostRecent.measurementUnits || '',
+        date: normalizeDate(mostRecent.dateOfService || mostRecent.visitDate) || '',
+        referenceRange: mostRecent.questReferenceRange,
+        questId: mostRecent.questBiomarkerId,
+        source: 'Final API',
+        historicalValues: historicalValues
+    };
+    
+    console.log(`🧪 Consolidated biomarker: ${biomarker.name} = ${biomarker.value} ${biomarker.unit} (${biomarker.status}) [${historicalValues.length} historical values]`);
+    return biomarker;
+}
+
+/**
  * Parse individual biomarker result from API response
+ * Used for single-result extraction (extractCurrentResultsOnly)
  */
 function parseBiomarkerResult(result) {
     if (!result || !result.biomarkerName) {
@@ -218,27 +412,32 @@ function parseBiomarkerResult(result) {
         return null;
     }
     
+    const status = result.testResultOutOfRange ? 'Out of Range' : 'In Range';
+    const normalizedDate = normalizeDate(result.dateOfService || result.visitDate);
+    
     const biomarker = {
         name: result.biomarkerName,
-        status: result.testResultOutOfRange ? 'Out of Range' : 'In Range',
+        status: status,
         value: result.testResult || '',
         unit: result.measurementUnits || '',
-        date: result.dateOfService || result.visitDate || '',
+        date: normalizedDate || '',
         historicalValues: [],
         source: 'Final API',
         questId: result.questBiomarkerId,
-        dateOfService: result.dateOfService,
-        visitDate: result.visitDate,
+        dateOfService: normalizeDate(result.dateOfService),
+        visitDate: normalizeDate(result.visitDate),
         referenceRange: result.questReferenceRange
     };
 
-    // Create historical entry for this result
-    if (result.dateOfService) {
+    // Create historical entry for this result with consistent structure
+    if (normalizedDate) {
         biomarker.historicalValues.push({
-            date: result.dateOfService,
+            date: normalizedDate,
             value: result.testResult,
+            unit: result.measurementUnits || '',
+            status: status,  // Include status string for consistency
             inRange: !result.testResultOutOfRange,
-            visitDate: result.visitDate
+            visitDate: normalizeDate(result.visitDate)
         });
     }
 
@@ -248,46 +447,75 @@ function parseBiomarkerResult(result) {
 
 /**
  * Get biomarker category from biomarker name
+ * Uses priority-based matching to avoid misclassification
  */
 function getBiomarkerCategoryFromName(biomarkerName) {
     if (!biomarkerName) return 'General';
     
     const name = biomarkerName.toLowerCase();
     
+    // HIGH PRIORITY: Check urinalysis suffix FIRST to avoid mismatches
+    // e.g., "Hyaline Casts - Urine" should NOT match "ast" -> Liver
+    if (name.includes('- urine') || name.endsWith(' urine')) {
+        console.log(`📂 Categorized "${biomarkerName}" as "Urinalysis" (urine suffix)`);
+        return 'Urinalysis';
+    }
+    
+    // Electrolytes category
+    const electrolytes = ['sodium', 'potassium', 'chloride', 'carbon dioxide', 'bicarbonate'];
+    for (const e of electrolytes) {
+        if (name === e || name.startsWith(e + ' ') || name.startsWith(e + ',')) {
+            console.log(`📂 Categorized "${biomarkerName}" as "Electrolytes" (matched: ${e})`);
+            return 'Electrolytes';
+        }
+    }
+    
     // Enhanced categorization based on actual Function Health biomarker names
+    // Using more specific matching to avoid false positives
     const categoryMap = {
         // Heart & Cardiovascular
         'cholesterol': 'Heart & Cardiovascular', 'hdl': 'Heart & Cardiovascular', 'ldl': 'Heart & Cardiovascular', 
         'triglyceride': 'Heart & Cardiovascular', 'apolipoprotein': 'Heart & Cardiovascular', 'lp-pla2': 'Heart & Cardiovascular',
-        'pcad': 'Heart & Cardiovascular', 'pcec': 'Heart & Cardiovascular',
+        'pcad': 'Heart & Cardiovascular', 'pcec': 'Heart & Cardiovascular', 'oxldl': 'Heart & Cardiovascular',
+        'trimethylamine': 'Heart & Cardiovascular', 'homocysteine': 'Heart & Cardiovascular',
         
-        // Blood & Hematology
+        // Blood & Hematology (use more specific patterns)
         'hemoglobin': 'Blood & Hematology', 'hematocrit': 'Blood & Hematology', 'platelet': 'Blood & Hematology',
-        'white blood': 'Blood & Hematology', 'red blood': 'Blood & Hematology', 'wbc': 'Blood & Hematology', 'rbc': 'Blood & Hematology',
+        'white blood cell': 'Blood & Hematology', 'red blood cell': 'Blood & Hematology', 
+        'neutrophil': 'Blood & Hematology', 'lymphocyte': 'Blood & Hematology', 'monocyte': 'Blood & Hematology',
+        'eosinophil': 'Blood & Hematology', 'basophil': 'Blood & Hematology', 'mcv': 'Blood & Hematology',
+        'mch': 'Blood & Hematology', 'mchc': 'Blood & Hematology', 'rdw': 'Blood & Hematology', 'mpv': 'Blood & Hematology',
         
         // Metabolic & Diabetes
         'glucose': 'Metabolic & Diabetes', 'insulin': 'Metabolic & Diabetes', 'hemoglobin a1c': 'Metabolic & Diabetes',
-        'hba1c': 'Metabolic & Diabetes', 'adiponectin': 'Metabolic & Diabetes',
+        'hba1c': 'Metabolic & Diabetes', 'adiponectin': 'Metabolic & Diabetes', 'uric acid': 'Metabolic & Diabetes',
+        'c-peptide': 'Metabolic & Diabetes',
         
         // Kidney & Renal
         'creatinine': 'Kidney & Renal', 'kidney': 'Kidney & Renal', 'urea': 'Kidney & Renal', 'bun': 'Kidney & Renal',
         'egfr': 'Kidney & Renal', 'glomerular': 'Kidney & Renal', 'cystatin': 'Kidney & Renal',
         
-        // Liver
-        'liver': 'Liver', 'alt': 'Liver', 'ast': 'Liver', 'alp': 'Liver', 'bilirubin': 'Liver',
-        'albumin': 'Liver', 'protein': 'Liver',
+        // Liver (use word boundaries to avoid matching "Hyaline Casts")
+        'liver': 'Liver', 'alanine transaminase': 'Liver', 'aspartate aminotransferase': 'Liver', 
+        'alkaline phosphatase': 'Liver', 'bilirubin': 'Liver', 'albumin': 'Liver', 
+        'total protein': 'Liver', 'globulin': 'Liver', 'ggtp': 'Liver', 'ggt': 'Liver',
         
         // Thyroid
-        'thyroid': 'Thyroid', 'tsh': 'Thyroid', 't3': 'Thyroid', 't4': 'Thyroid', 'thyroxine': 'Thyroid',
+        'thyroid': 'Thyroid', 'tsh': 'Thyroid', 'triiodothyronine': 'Thyroid', 'thyroxine': 'Thyroid',
         
         // Hormones
         'testosterone': 'Hormones', 'estradiol': 'Hormones', 'cortisol': 'Hormones', 'dhea': 'Hormones',
-        'progesterone': 'Hormones', 'fsh': 'Hormones', 'lh': 'Hormones',
+        'progesterone': 'Hormones', 'follicle stimulating': 'Hormones', 'luteinizing hormone': 'Hormones',
+        'prolactin': 'Hormones', 'shbg': 'Hormones', 'sex hormone binding': 'Hormones',
+        'androstenedione': 'Hormones', 'dihydrotestosterone': 'Hormones',
+        'insulin-like growth factor': 'Hormones', 'igf-1': 'Hormones', 'igf': 'Hormones',
         
-        // Nutrients & Vitamins
-        'vitamin': 'Nutrients & Vitamins', 'iron': 'Nutrients & Vitamins', 'calcium': 'Nutrients & Vitamins',
-        'magnesium': 'Nutrients & Vitamins', 'zinc': 'Nutrients & Vitamins', 'b12': 'Nutrients & Vitamins',
-        'folate': 'Nutrients & Vitamins', 'ferritin': 'Nutrients & Vitamins',
+        // Nutrients & Vitamins (also matches API category "Nutrients")
+        'vitamin': 'Nutrients', 'iron': 'Nutrients', 'calcium': 'Nutrients',
+        'magnesium': 'Nutrients', 'zinc': 'Nutrients', 'b12': 'Nutrients',
+        'folate': 'Nutrients', 'ferritin': 'Nutrients', 'omega': 'Nutrients',
+        'arachidonic': 'Nutrients', 'epa': 'Nutrients', 'dha': 'Nutrients',
+        'fatty acid': 'Nutrients', 'linoleic': 'Nutrients', 'alpha-linolenic': 'Nutrients',
         
         // Infectious Disease & STDs
         'herpes': 'Infectious Disease', 'hiv': 'Infectious Disease', 'chlamydia': 'Infectious Disease',
@@ -295,7 +523,9 @@ function getBiomarkerCategoryFromName(biomarkerName) {
         'hepatitis': 'Infectious Disease',
         
         // Inflammation & Immune
-        'c-reactive': 'Inflammation', 'crp': 'Inflammation', 'esr': 'Inflammation', 'sed rate': 'Inflammation'
+        'c-reactive': 'Inflammation', 'crp': 'Inflammation', 'esr': 'Inflammation', 'sed rate': 'Inflammation',
+        'fibrinogen': 'Inflammation', 'myeloperoxidase': 'Inflammation', 'ana': 'Inflammation',
+        'antinuclear': 'Inflammation'
     };
     
     for (const [keyword, category] of Object.entries(categoryMap)) {
@@ -394,13 +624,43 @@ function parseAPIResponseCurrentOnly(rawData) {
             
             if (requisition.visits && Array.isArray(requisition.visits)) {
                 requisition.visits.forEach((visit, visitIndex) => {
+                    // Check for biomarker entries with parent biomarker info (new API structure)
+                    if (visit.biomarkers && Array.isArray(visit.biomarkers)) {
+                        visit.biomarkers.forEach(entry => {
+                            const apiCategory = entry.biomarker?.categories?.[0]?.categoryName || null;
+                            const biomarkerName = entry.biomarker?.name || '';
+                            
+                            if (entry.biomarkerResults && Array.isArray(entry.biomarkerResults)) {
+                                entry.biomarkerResults.forEach(result => {
+                                    allBiomarkerResults.push({
+                                        ...result,
+                                        biomarkerName: result.biomarkerName || biomarkerName,
+                                        apiCategory: apiCategory,
+                                        visitDate: visit.visitDate,
+                                        visitId: visit.id
+                                    });
+                                });
+                            }
+                        });
+                    }
+                    
+                    // Also check for direct biomarkerResults (legacy structure)
                     if (visit.biomarkerResults && Array.isArray(visit.biomarkerResults)) {
                         visit.biomarkerResults.forEach(result => {
-                            allBiomarkerResults.push({
-                                ...result,
-                                visitDate: visit.visitDate,
-                                visitId: visit.id
-                            });
+                            const alreadyAdded = allBiomarkerResults.some(r => 
+                                r.id === result.id || 
+                                (r.biomarkerName === result.biomarkerName && 
+                                 r.dateOfService === result.dateOfService &&
+                                 r.testResult === result.testResult)
+                            );
+                            
+                            if (!alreadyAdded) {
+                                allBiomarkerResults.push({
+                                    ...result,
+                                    visitDate: visit.visitDate,
+                                    visitId: visit.id
+                                });
+                            }
                         });
                     }
                 });
@@ -415,40 +675,60 @@ function parseAPIResponseCurrentOnly(rawData) {
         return data;
     }
 
-    // Group by biomarker name and get the most recent result for each
+    // Group by NORMALIZED biomarker name and get the most recent result for each
+    // This handles variations like "Omega 3 Total" vs "Omega-3 Total" vs "Omega 3 Total / OmegaCheck"
     const biomarkerGroups = {};
     
     allBiomarkerResults.forEach(result => {
-        const biomarkerName = result.biomarkerName;
-        if (!biomarkerName) return;
+        const originalName = result.biomarkerName;
+        if (!originalName) return;
         
-        // Normalize biomarker name to handle slight variations
-        const normalizedName = biomarkerName.trim();
+        // Normalize biomarker name to handle variations
+        const normalizedName = normalizeBiomarkerName(originalName);
         
         if (!biomarkerGroups[normalizedName]) {
-            biomarkerGroups[normalizedName] = [];
+            biomarkerGroups[normalizedName] = { 
+                results: [], 
+                apiCategory: null,
+                originalNames: new Set()
+            };
         }
         
-        biomarkerGroups[normalizedName].push(result);
+        biomarkerGroups[normalizedName].results.push(result);
+        biomarkerGroups[normalizedName].originalNames.add(originalName);
+        
+        // Capture API category if available
+        if (!biomarkerGroups[normalizedName].apiCategory && result.apiCategory) {
+            biomarkerGroups[normalizedName].apiCategory = result.apiCategory;
+        }
     });
     
-    console.log(`📊 Found ${Object.keys(biomarkerGroups).length} unique biomarkers`);
+    console.log(`📊 Found ${Object.keys(biomarkerGroups).length} unique biomarkers after normalization`);
     
     // For each biomarker, get the most recent result
     const currentResults = [];
     
-    Object.entries(biomarkerGroups).forEach(([biomarkerName, results]) => {
+    Object.entries(biomarkerGroups).forEach(([normalizedName, group]) => {
         // Sort by date (most recent first)
-        const sortedResults = results.sort((a, b) => {
+        const sortedResults = group.results.sort((a, b) => {
             const dateA = new Date(a.dateOfService || a.visitDate || '1900-01-01');
             const dateB = new Date(b.dateOfService || b.visitDate || '1900-01-01');
             return dateB - dateA; // Most recent first
         });
         
         const mostRecent = sortedResults[0];
+        // Use the best display name from all variations
+        const displayName = getBestDisplayName([...group.originalNames]);
+        mostRecent.biomarkerName = displayName; // Use clean display name
+        mostRecent.apiCategory = group.apiCategory;
         currentResults.push(mostRecent);
         
-        console.log(`📅 ${biomarkerName}: Using result from ${mostRecent.dateOfService || mostRecent.visitDate} (${sortedResults.length} total results available)`);
+        const variantCount = group.originalNames.size;
+        if (variantCount > 1) {
+            console.log(`📅 ${displayName}: Merged ${variantCount} name variants, using result from ${mostRecent.dateOfService || mostRecent.visitDate}`);
+        } else {
+            console.log(`📅 ${displayName}: Using result from ${mostRecent.dateOfService || mostRecent.visitDate} (${sortedResults.length} total results available)`);
+        }
     });
     
     console.log(`✅ Filtered to ${currentResults.length} current results`);
@@ -470,8 +750,14 @@ function parseAPIResponseCurrentOnly(rawData) {
                 
                 processedBiomarkers.add(normalizedName);
                 
-                // Determine category based on biomarker name
-                const categoryName = getBiomarkerCategoryFromName(result.biomarkerName) || 'General';
+                // Use API-provided category if available, otherwise fall back to keyword matching
+                let categoryName = result.apiCategory;
+                if (!categoryName) {
+                    categoryName = getBiomarkerCategoryFromName(result.biomarkerName) || 'General';
+                }
+                
+                // Store the category on the biomarker
+                biomarker.category = categoryName;
                 
                 if (!data.categories[categoryName]) {
                     data.categories[categoryName] = {
@@ -493,7 +779,8 @@ function parseAPIResponseCurrentOnly(rawData) {
                     data.categories[categoryName].outOfRange++;
                 }
                 
-                console.log(`✅ Added: ${normalizedName} (${biomarker.date})`);
+                const categorySource = result.apiCategory ? 'from API' : 'from keywords';
+                console.log(`✅ Added: ${normalizedName} to "${categoryName}" (${categorySource})`);
             }
         } catch (error) {
             console.warn(`⚠️ Error parsing current biomarker result ${index}:`, error);
