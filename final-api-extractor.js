@@ -65,6 +65,76 @@ function getBestDisplayName(names) {
 }
 
 /**
+ * Map API category names to internal category names
+ * Function Health API uses different naming than our internal categories
+ */
+function mapApiCategoryToInternal(apiCategory) {
+    if (!apiCategory) return null;
+    
+    const categoryMapping = {
+        // Heart / Cardiovascular
+        'Heart': 'Heart & Cardiovascular',
+        'Cardiovascular': 'Heart & Cardiovascular',
+        'Heart Health': 'Heart & Cardiovascular',
+        
+        // Blood
+        'Blood': 'Blood & Hematology',
+        'Hematology': 'Blood & Hematology',
+        
+        // Metabolic
+        'Metabolic': 'Metabolic & Diabetes',
+        'Diabetes': 'Metabolic & Diabetes',
+        'Metabolism': 'Metabolic & Diabetes',
+        
+        // Kidney
+        'Kidney': 'Kidney & Renal',
+        'Renal': 'Kidney & Renal',
+        
+        // Direct matches (API name = internal name)
+        'Liver': 'Liver',
+        'Thyroid': 'Thyroid',
+        'Hormones': 'Hormones',
+        'Nutrients': 'Nutrients',
+        'Electrolytes': 'Electrolytes',
+        'Urinalysis': 'Urinalysis',
+        'Inflammation': 'Inflammation',
+        
+        // Infectious Disease
+        'Infectious': 'Infectious Disease',
+        'Infectious Disease': 'Infectious Disease',
+        'STD': 'Infectious Disease',
+        'STI': 'Infectious Disease',
+        
+        // Environmental Toxins
+        'Environmental Toxins': 'Environmental Toxins',
+        'Environmental': 'Environmental Toxins',
+        'Toxins': 'Environmental Toxins',
+        'Heavy Metals': 'Environmental Toxins',
+        
+        // Autoimmunity
+        'Autoimmunity': 'Autoimmunity',
+        'Autoimmune': 'Autoimmunity'
+    };
+    
+    // Check for exact match first
+    if (categoryMapping[apiCategory]) {
+        return categoryMapping[apiCategory];
+    }
+    
+    // Check for partial match (API might return variations)
+    const lowerApi = apiCategory.toLowerCase();
+    for (const [key, value] of Object.entries(categoryMapping)) {
+        if (lowerApi.includes(key.toLowerCase())) {
+            return value;
+        }
+    }
+    
+    // Return original if no mapping found
+    console.log(`⚠️ Unknown API category: "${apiCategory}" - using as-is`);
+    return apiCategory;
+}
+
+/**
  * Get the working authentication token
  */
 function getWorkingToken() {
@@ -294,8 +364,8 @@ function parseAPIResponse(rawData) {
         try {
             const biomarker = createConsolidatedBiomarker(group.results, displayName);
             if (biomarker) {
-                // Use API-provided category if available, otherwise fall back to keyword matching
-                let categoryName = group.apiCategory;
+                // Use API-provided category if available (mapped to internal name), otherwise fall back to keyword matching
+                let categoryName = group.apiCategory ? mapApiCategoryToInternal(group.apiCategory) : null;
                 if (!categoryName) {
                     categoryName = getBiomarkerCategoryFromName(displayName) || 'General';
                 }
@@ -476,6 +546,7 @@ function getBiomarkerCategoryFromName(biomarkerName) {
         // Heart & Cardiovascular
         'cholesterol': 'Heart & Cardiovascular', 'hdl': 'Heart & Cardiovascular', 'ldl': 'Heart & Cardiovascular', 
         'triglyceride': 'Heart & Cardiovascular', 'apolipoprotein': 'Heart & Cardiovascular', 'lp-pla2': 'Heart & Cardiovascular',
+        'lipoprotein': 'Heart & Cardiovascular', 'lp(a)': 'Heart & Cardiovascular',
         'pcad': 'Heart & Cardiovascular', 'pcec': 'Heart & Cardiovascular', 'oxldl': 'Heart & Cardiovascular',
         'trimethylamine': 'Heart & Cardiovascular', 'homocysteine': 'Heart & Cardiovascular',
         
@@ -525,7 +596,18 @@ function getBiomarkerCategoryFromName(biomarkerName) {
         // Inflammation & Immune
         'c-reactive': 'Inflammation', 'crp': 'Inflammation', 'esr': 'Inflammation', 'sed rate': 'Inflammation',
         'fibrinogen': 'Inflammation', 'myeloperoxidase': 'Inflammation', 'ana': 'Inflammation',
-        'antinuclear': 'Inflammation'
+        'antinuclear': 'Inflammation',
+        
+        // Environmental Toxins & Heavy Metals
+        'mercury': 'Environmental Toxins', 'lead': 'Environmental Toxins', 'arsenic': 'Environmental Toxins',
+        'cadmium': 'Environmental Toxins', 'thallium': 'Environmental Toxins', 'heavy metal': 'Environmental Toxins',
+        
+        // Autoimmunity
+        'antibody': 'Autoimmunity', 'autoantibody': 'Autoimmunity', 'centromere': 'Autoimmunity',
+        'anti-dsdna': 'Autoimmunity', 'anti-smith': 'Autoimmunity', 'scleroderma': 'Autoimmunity',
+        'lupus': 'Autoimmunity', 'rheumatoid factor': 'Autoimmunity', 'sjogren': 'Autoimmunity',
+        'jo-1': 'Autoimmunity', 'scl-70': 'Autoimmunity', 'ssa': 'Autoimmunity', 'ssb': 'Autoimmunity',
+        'rnp': 'Autoimmunity', 'chromatin': 'Autoimmunity', 'ribosomal': 'Autoimmunity'
     };
     
     for (const [keyword, category] of Object.entries(categoryMap)) {
@@ -750,8 +832,8 @@ function parseAPIResponseCurrentOnly(rawData) {
                 
                 processedBiomarkers.add(normalizedName);
                 
-                // Use API-provided category if available, otherwise fall back to keyword matching
-                let categoryName = result.apiCategory;
+                // Use API-provided category if available (mapped to internal name), otherwise fall back to keyword matching
+                let categoryName = result.apiCategory ? mapApiCategoryToInternal(result.apiCategory) : null;
                 if (!categoryName) {
                     categoryName = getBiomarkerCategoryFromName(result.biomarkerName) || 'General';
                 }
