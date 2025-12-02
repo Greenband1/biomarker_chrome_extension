@@ -576,6 +576,8 @@ function getBiomarkerCategoryFromName(biomarkerName) {
         'liver': 'Liver', 'alanine transaminase': 'Liver', 'aspartate aminotransferase': 'Liver', 
         'alkaline phosphatase': 'Liver', 'bilirubin': 'Liver', 'albumin': 'Liver', 
         'total protein': 'Liver', 'globulin': 'Liver', 'ggtp': 'Liver', 'ggt': 'Liver',
+        'gamma-glutamyl': 'Liver', '(alt)': 'Liver', '(ast)': 'Liver', '(alp)': 'Liver',
+        'albumin/globulin': 'Liver', 'a/g ratio': 'Liver',
         
         // Thyroid
         'thyroid': 'Thyroid', 'tsh': 'Thyroid', 'triiodothyronine': 'Thyroid', 'thyroxine': 'Thyroid',
