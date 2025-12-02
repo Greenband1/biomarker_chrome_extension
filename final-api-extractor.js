@@ -265,6 +265,24 @@ function parseAPIResponse(rawData) {
                         biomarkerResultsCount: visit.biomarkerResults ? visit.biomarkerResults.length : 0
                     });
                     
+                    // Build a lookup map of biomarker ID -> category from visit.biomarkers
+                    // This allows us to find categories for results in the legacy path
+                    const biomarkerCategoryMap = new Map();
+                    const biomarkerNameMap = new Map();
+                    
+                    if (visit.biomarkers && Array.isArray(visit.biomarkers)) {
+                        visit.biomarkers.forEach(entry => {
+                            const biomarkerId = entry.biomarker?.id;
+                            const category = entry.biomarker?.categories?.[0]?.categoryName || null;
+                            const name = entry.biomarker?.name || '';
+                            
+                            if (biomarkerId) {
+                                if (category) biomarkerCategoryMap.set(biomarkerId, category);
+                                if (name) biomarkerNameMap.set(biomarkerId, name);
+                            }
+                        });
+                    }
+                    
                     // Check if visit has biomarker entries with parent biomarker info (new API structure)
                     if (visit.biomarkers && Array.isArray(visit.biomarkers)) {
                         visit.biomarkers.forEach(entry => {
@@ -300,8 +318,15 @@ function parseAPIResponse(rawData) {
                             );
                             
                             if (!alreadyAdded) {
+                                // Try to find category from the biomarker lookup map
+                                const biomarkerId = result.biomarkerId;
+                                const apiCategory = biomarkerId ? biomarkerCategoryMap.get(biomarkerId) : null;
+                                const parentName = biomarkerId ? biomarkerNameMap.get(biomarkerId) : null;
+                                
                                 allBiomarkerResults.push({
                                     ...result,
+                                    biomarkerName: result.biomarkerName || parentName || '',
+                                    apiCategory: apiCategory,
                                     visitDate: visit.visitDate,
                                     visitId: visit.id
                                 });
@@ -712,6 +737,24 @@ function parseAPIResponseCurrentOnly(rawData) {
             
             if (requisition.visits && Array.isArray(requisition.visits)) {
                 requisition.visits.forEach((visit, visitIndex) => {
+                    // Build a lookup map of biomarker ID -> category from visit.biomarkers
+                    // This allows us to find categories for results in the legacy path
+                    const biomarkerCategoryMap = new Map();
+                    const biomarkerNameMap = new Map();
+                    
+                    if (visit.biomarkers && Array.isArray(visit.biomarkers)) {
+                        visit.biomarkers.forEach(entry => {
+                            const biomarkerId = entry.biomarker?.id;
+                            const category = entry.biomarker?.categories?.[0]?.categoryName || null;
+                            const name = entry.biomarker?.name || '';
+                            
+                            if (biomarkerId) {
+                                if (category) biomarkerCategoryMap.set(biomarkerId, category);
+                                if (name) biomarkerNameMap.set(biomarkerId, name);
+                            }
+                        });
+                    }
+                    
                     // Check for biomarker entries with parent biomarker info (new API structure)
                     if (visit.biomarkers && Array.isArray(visit.biomarkers)) {
                         visit.biomarkers.forEach(entry => {
@@ -743,8 +786,15 @@ function parseAPIResponseCurrentOnly(rawData) {
                             );
                             
                             if (!alreadyAdded) {
+                                // Try to find category from the biomarker lookup map
+                                const biomarkerId = result.biomarkerId;
+                                const apiCategory = biomarkerId ? biomarkerCategoryMap.get(biomarkerId) : null;
+                                const parentName = biomarkerId ? biomarkerNameMap.get(biomarkerId) : null;
+                                
                                 allBiomarkerResults.push({
                                     ...result,
+                                    biomarkerName: result.biomarkerName || parentName || '',
+                                    apiCategory: apiCategory,
                                     visitDate: visit.visitDate,
                                     visitId: visit.id
                                 });
