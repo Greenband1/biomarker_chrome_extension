@@ -1,9 +1,195 @@
 /**
- * Final API Extractor - Uses proven working authentication
- * Based on successful token analysis: userData.idToken works perfectly
+ * Final API Extractor - Uses results-report endpoint for better categorization
+ * Features: Dynamic API endpoint discovery with fallback support
  */
 
 console.log('🚀 Final API Extractor loading...');
+
+// =============================================================================
+// API ENDPOINT DISCOVERY MODULE
+// =============================================================================
+
+/**
+ * Known API endpoints (relative paths)
+ */
+const KNOWN_ENDPOINTS = {
+    resultsReport: '/api/v1/results-report',
+    requisitions: '/api/v1/requisitions?pending=false'
+};
+
+/**
+ * Known base URLs (ordered by preference, most likely first)
+ */
+const KNOWN_BASE_URLS = [
+    'https://production-member-app-mid-lhuqotpy2a-ue.a.run.app'
+];
+
+/**
+ * Current app version for API headers
+ */
+const FE_APP_VERSION = '0.84.76';
+
+/**
+ * Cache for discovered API base URL (persists for page session)
+ */
+let discoveredBaseUrl = null;
+
+/**
+ * Setup fetch interception to discover API base URL dynamically
+ * This captures the actual endpoint the Function Health website uses
+ */
+function setupApiDiscovery() {
+    if (window.__FH_API_DISCOVERY_ACTIVE) return;
+    window.__FH_API_DISCOVERY_ACTIVE = true;
+    
+    const originalFetch = window.fetch;
+    
+    window.fetch = async function(input, init) {
+        const request = new Request(input, init);
+        const url = request.url;
+        
+        // Check if this is a Function Health API call
+        if (url.includes('/api/v1/') && url.includes('.run.app')) {
+            try {
+                const parsed = new URL(url);
+                const baseUrl = `${parsed.protocol}//${parsed.host}`;
+                
+                if (!discoveredBaseUrl) {
+                    discoveredBaseUrl = baseUrl;
+                    console.log('🔍 Discovered API base URL:', discoveredBaseUrl);
+                    
+                    // Cache it for future use
+                    try {
+                        sessionStorage.setItem('fh_api_base_url', baseUrl);
+                    } catch (e) { /* ignore storage errors */ }
+                }
+            } catch (e) {
+                console.warn('Failed to parse API URL:', e);
+            }
+        }
+        
+        return originalFetch.apply(this, arguments);
+    };
+    
+    console.log('🔍 API discovery interceptor installed');
+}
+
+/**
+ * Get cached or discovered API base URL
+ */
+function getCachedBaseUrl() {
+    // Check if already discovered this session
+    if (discoveredBaseUrl) {
+        return discoveredBaseUrl;
+    }
+    
+    // Check sessionStorage cache
+    try {
+        const cached = sessionStorage.getItem('fh_api_base_url');
+        if (cached) {
+            console.log('📦 Using cached API base URL:', cached);
+            discoveredBaseUrl = cached;
+            return cached;
+        }
+    } catch (e) { /* ignore storage errors */ }
+    
+    return null;
+}
+
+/**
+ * Get the best available API base URL
+ * Uses discovery chain: cached -> intercepted -> fallback
+ */
+function getApiBaseUrl() {
+    // Try cached/discovered URL first
+    const baseUrl = getCachedBaseUrl();
+    if (baseUrl) return baseUrl;
+    
+    // Fall back to known URLs
+    console.log('⚠️ Using fallback API base URL');
+    return KNOWN_BASE_URLS[0];
+}
+
+/**
+ * Build standard API request headers
+ */
+function buildApiHeaders(token) {
+    return {
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Authorization': `Bearer ${token}`,
+        'Origin': 'https://my.functionhealth.com',
+        'Referer': 'https://my.functionhealth.com/',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'cross-site',
+        'User-Agent': navigator.userAgent,
+        'fe-app-version': FE_APP_VERSION,
+        'x-backend-skip-cache': 'true'
+    };
+}
+
+/**
+ * Make API request with automatic retry on different base URLs
+ */
+async function fetchWithFallback(endpoint, token) {
+    const headers = buildApiHeaders(token);
+    const options = {
+        method: 'GET',
+        credentials: 'include',
+        headers: headers
+    };
+    
+    // Try primary base URL first
+    const primaryBase = getApiBaseUrl();
+    const primaryUrl = `${primaryBase}${endpoint}`;
+    
+    console.log(`📡 Trying primary endpoint: ${primaryUrl}`);
+    
+    try {
+        const response = await fetch(primaryUrl, options);
+        if (response.ok) {
+            console.log(`✅ Primary endpoint succeeded: ${response.status}`);
+            return response;
+        }
+        console.warn(`⚠️ Primary endpoint returned: ${response.status} ${response.statusText}`);
+    } catch (error) {
+        console.warn(`❌ Primary endpoint failed: ${primaryUrl}`, error.message);
+    }
+    
+    // Try fallback base URLs
+    for (const fallbackBase of KNOWN_BASE_URLS) {
+        if (fallbackBase === primaryBase) continue; // Skip already tried
+        
+        const fallbackUrl = `${fallbackBase}${endpoint}`;
+        console.log(`🔄 Trying fallback: ${fallbackUrl}`);
+        
+        try {
+            const response = await fetch(fallbackUrl, options);
+            if (response.ok) {
+                // Update discovered URL for future requests
+                discoveredBaseUrl = fallbackBase;
+                try {
+                    sessionStorage.setItem('fh_api_base_url', fallbackBase);
+                } catch (e) { /* ignore */ }
+                console.log(`✅ Fallback endpoint succeeded: ${response.status}`);
+                return response;
+            }
+            console.warn(`⚠️ Fallback returned: ${response.status} ${response.statusText}`);
+        } catch (error) {
+            console.warn(`❌ Fallback failed: ${fallbackUrl}`, error.message);
+        }
+    }
+    
+    throw new Error(`All API endpoints failed for ${endpoint}`);
+}
+
+// Initialize API discovery on script load
+setupApiDiscovery();
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
 
 /**
  * Normalize date to YYYY-MM-DD format for consistent comparison
@@ -64,18 +250,22 @@ function getBestDisplayName(names) {
     return sorted[0];
 }
 
+// =============================================================================
+// CATEGORY MAPPING
+// =============================================================================
+
 /**
  * Map API category names to internal category names (with normalization)
- * HYBRID APPROACH: Accept any API category, only normalize for UI consistency
- * Unknown categories are accepted as-is (not forced to "General")
+ * Handles short names from results-report API (e.g., "Heart", "Kidney")
+ * Unknown categories are accepted as-is for forward compatibility
  */
 function mapApiCategoryToInternal(apiCategory) {
     if (!apiCategory) return null;
     
-    // Only normalize categories that need expanded/consistent naming
-    // All other API categories are accepted as-is
+    // Normalize categories for UI consistency
+    // Short API names -> Expanded display names
     const categoryNormalization = {
-        // Expand abbreviated names for UI consistency
+        // Expand abbreviated names
         'Heart': 'Heart & Cardiovascular',
         'Cardiovascular': 'Heart & Cardiovascular',
         'Heart Health': 'Heart & Cardiovascular',
@@ -91,7 +281,7 @@ function mapApiCategoryToInternal(apiCategory) {
         'Infectious': 'Infectious Disease',
         'STD': 'Infectious Disease',
         'STI': 'Infectious Disease',
-        'Other': 'Infectious Disease',  // "Other" in PDF contains STDs
+        'Other': 'Infectious Disease',
         'Environmental': 'Environmental Toxins',
         'Toxins': 'Environmental Toxins',
         'Heavy Metals': 'Environmental Toxins',
@@ -104,7 +294,18 @@ function mapApiCategoryToInternal(apiCategory) {
         // Sex-specific to unified category
         'Male Health': 'Reproductive Health',
         'Female Health': 'Reproductive Health',
-        'Reproductive': 'Reproductive Health'
+        'Reproductive': 'Reproductive Health',
+        
+        // Pass-through categories (already good names)
+        'Immune Regulation': 'Immune Regulation',
+        'Nutrients': 'Nutrients',
+        'Liver': 'Liver',
+        'Thyroid': 'Thyroid',
+        'Electrolytes': 'Electrolytes',
+        'Pancreas': 'Pancreas',
+        'Environmental Toxins': 'Environmental Toxins',
+        'Autoimmunity': 'Autoimmunity',
+        'Biological Age': 'Biological Age'
     };
     
     // Check for exact normalization match
@@ -120,14 +321,43 @@ function mapApiCategoryToInternal(apiCategory) {
         }
     }
     
-    // HYBRID: Accept unknown API categories as-is (don't force to "General")
-    // This allows new Function Health categories to work automatically
+    // Accept unknown API categories as-is for forward compatibility
     console.log(`📂 New API category detected: "${apiCategory}" - using as-is`);
     return apiCategory;
 }
 
 /**
- * Get the working authentication token
+ * Get biomarker category from biomarker name (fallback for uncategorized biomarkers)
+ * Only used for the ~7 infectious disease tests that lack API categories
+ */
+function getBiomarkerCategoryFromName(biomarkerName) {
+    if (!biomarkerName) return 'Infectious Disease';
+    
+    const name = biomarkerName.toLowerCase();
+    
+    // Infectious disease tests (the main use case for this fallback)
+    const infectiousKeywords = [
+        'herpes', 'hiv', 'chlamydia', 'gonorrhoea', 'gonorrhea',
+        'syphilis', 'trichomonas', 'hepatitis', 'std', 'sti'
+    ];
+    
+    for (const keyword of infectiousKeywords) {
+        if (name.includes(keyword)) {
+            return 'Infectious Disease';
+        }
+    }
+    
+    // If not infectious, return General (but this should rarely happen with results-report API)
+    console.log(`📂 Fallback categorization for "${biomarkerName}" -> "General"`);
+    return 'General';
+}
+
+// =============================================================================
+// AUTHENTICATION
+// =============================================================================
+
+/**
+ * Get the working authentication token from localStorage
  */
 function getWorkingToken() {
     try {
@@ -166,74 +396,16 @@ function getWorkingToken() {
     }
 }
 
-/**
- * Extract biomarker data using the working token
- */
-async function extractViaFinalAPI() {
-    console.log('⚡ Starting final API extraction...');
-    
-    try {
-        // Get the working token
-        const token = getWorkingToken();
-        console.log('🔐 Using working token from userData.idToken');
-        
-        // Make the API request with exact headers that work
-        const apiUrl = 'https://production-member-app-mid-lhuqotpy2a-ue.a.run.app/api/v1/requisitions?pending=false';
-        console.log('📡 Requesting full biomarker data...');
-        
-        const response = await fetch(apiUrl, {
-            method: 'GET',
-            credentials: 'include',
-            headers: {
-                'Accept': 'application/json, text/plain, */*',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Authorization': `Bearer ${token}`,
-                'Origin': 'https://my.functionhealth.com',
-                'Referer': 'https://my.functionhealth.com/',
-                'Sec-Fetch-Dest': 'empty',
-                'Sec-Fetch-Mode': 'cors',
-                'Sec-Fetch-Site': 'cross-site',
-                'User-Agent': navigator.userAgent,
-                'fe-app-version': '0.84.25',
-                'x-backend-skip-cache': 'true'
-            }
-        });
-        
-        console.log(`📊 API Response: ${response.status} ${response.statusText}`);
-        
-        if (!response.ok) {
-            throw new Error(`API request failed: ${response.status} ${response.statusText}`);
-        }
-        
-        const rawData = await response.json();
-        console.log('✅ Raw data received, parsing...');
-        
-        // Parse the data
-        const parsedData = parseAPIResponse(rawData);
-        
-        console.log('🎯 Final extraction complete:', {
-            categories: Object.keys(parsedData.categories).length,
-            totalBiomarkers: Object.values(parsedData.categories).reduce((sum, cat) => sum + cat.biomarkers.length, 0)
-        });
-        
-        return parsedData;
-        
-    } catch (error) {
-        console.error('❌ Final extraction failed:', error);
-        throw error;
-    }
-}
+// =============================================================================
+// RESULTS-REPORT API PARSER
+// =============================================================================
 
 /**
- * Parse API response into the expected format
+ * Parse the results-report API response format
+ * This API provides authoritative category information for 96% of biomarkers
  */
-function parseAPIResponse(rawData) {
-    console.log('🔄 Parsing API response...');
-    console.log('📊 Raw API response structure:', {
-        isArray: Array.isArray(rawData),
-        length: Array.isArray(rawData) ? rawData.length : 'N/A',
-        firstItemKeys: Array.isArray(rawData) && rawData.length > 0 ? Object.keys(rawData[0]) : 'N/A'
-    });
+function parseResultsReportResponse(rawData) {
+    console.log('🔄 Parsing results-report API response...');
     
     const data = {
         categories: {},
@@ -244,195 +416,166 @@ function parseAPIResponse(rawData) {
             total: 0
         },
         extractedAt: new Date().toISOString(),
-        source: 'Final API Extractor'
+        source: 'Results Report API'
     };
 
-    // Extract all biomarker results from the nested structure
-    let allBiomarkerResults = [];
+    // Extract biomarkerResultsRecord from the response
+    const records = rawData?.data?.biomarkerResultsRecord;
     
-    // STEP 1: Build a GLOBAL lookup map of biomarker ID -> category/name
-    // This scans ALL requisitions and visits FIRST before processing results
-    // This ensures we can find categories even if a visit only has biomarkerResults
-    const globalBiomarkerCategoryMap = new Map();
-    const globalBiomarkerNameMap = new Map();
-    
-    if (Array.isArray(rawData)) {
-        rawData.forEach(requisition => {
-            if (requisition.visits && Array.isArray(requisition.visits)) {
-                requisition.visits.forEach(visit => {
-                    if (visit.biomarkers && Array.isArray(visit.biomarkers)) {
-                        visit.biomarkers.forEach(entry => {
-                            const biomarkerId = entry.biomarker?.id;
-                            const category = entry.biomarker?.categories?.[0]?.categoryName || null;
-                            const name = entry.biomarker?.name || '';
-                            
-                            if (biomarkerId) {
-                                // Only set if not already set (keep first found)
-                                if (category && !globalBiomarkerCategoryMap.has(biomarkerId)) {
-                                    globalBiomarkerCategoryMap.set(biomarkerId, category);
-                                }
-                                if (name && !globalBiomarkerNameMap.has(biomarkerId)) {
-                                    globalBiomarkerNameMap.set(biomarkerId, name);
-                                }
-                            }
-                        });
-                    }
-                });
-            }
-        });
-    }
-    
-    console.log(`📂 Built global biomarker lookup: ${globalBiomarkerCategoryMap.size} categories, ${globalBiomarkerNameMap.size} names`);
-    
-    // STEP 2: Now process all results using the global lookup map
-    if (Array.isArray(rawData)) {
-        // Each item in the array is a requisition with visits
-        rawData.forEach((requisition, reqIndex) => {
-            console.log(`📋 Processing requisition ${reqIndex + 1}:`, {
-                id: requisition.id,
-                visitsCount: requisition.visits ? requisition.visits.length : 0
-            });
-            
-            if (requisition.visits && Array.isArray(requisition.visits)) {
-                requisition.visits.forEach((visit, visitIndex) => {
-                    console.log(`🏥 Processing visit ${visitIndex + 1}:`, {
-                        visitDate: visit.visitDate,
-                        biomarkerResultsCount: visit.biomarkerResults ? visit.biomarkerResults.length : 0
-                    });
-                    
-                    // Check if visit has biomarker entries with parent biomarker info (new API structure)
-                    if (visit.biomarkers && Array.isArray(visit.biomarkers)) {
-                        visit.biomarkers.forEach(entry => {
-                            // Extract category from parent biomarker object
-                            const apiCategory = entry.biomarker?.categories?.[0]?.categoryName || null;
-                            const biomarkerName = entry.biomarker?.name || '';
-                            
-                            if (entry.biomarkerResults && Array.isArray(entry.biomarkerResults)) {
-                                entry.biomarkerResults.forEach(result => {
-                                    allBiomarkerResults.push({
-                                        ...result,
-                                        // Use biomarker name from parent if result's name is empty
-                                        biomarkerName: result.biomarkerName || biomarkerName,
-                                        // Attach API-provided category
-                                        apiCategory: apiCategory,
-                                        visitDate: visit.visitDate,
-                                        visitId: visit.id
-                                    });
-                                });
-                            }
-                        });
-                    }
-                    
-                    // Also check for direct biomarkerResults (legacy/alternative structure)
-                    if (visit.biomarkerResults && Array.isArray(visit.biomarkerResults)) {
-                        visit.biomarkerResults.forEach(result => {
-                            // Only add if not already added via biomarkers array
-                            const alreadyAdded = allBiomarkerResults.some(r => 
-                                r.id === result.id || 
-                                (r.biomarkerName === result.biomarkerName && 
-                                 r.dateOfService === result.dateOfService &&
-                                 r.testResult === result.testResult)
-                            );
-                            
-                            if (!alreadyAdded) {
-                                // Use GLOBAL lookup map to find category
-                                const biomarkerId = result.biomarkerId;
-                                const apiCategory = biomarkerId ? globalBiomarkerCategoryMap.get(biomarkerId) : null;
-                                const parentName = biomarkerId ? globalBiomarkerNameMap.get(biomarkerId) : null;
-                                
-                                allBiomarkerResults.push({
-                                    ...result,
-                                    biomarkerName: result.biomarkerName || parentName || '',
-                                    apiCategory: apiCategory,
-                                    visitDate: visit.visitDate,
-                                    visitId: visit.id
-                                });
-                            }
-                        });
-                    }
-                });
-            }
-        });
-    }
-
-    console.log(`📊 Total biomarker results extracted: ${allBiomarkerResults.length}`);
-
-    if (allBiomarkerResults.length === 0) {
-        console.warn('⚠️ No biomarker results found in API response');
+    if (!Array.isArray(records)) {
+        console.warn('⚠️ No biomarkerResultsRecord found in API response');
+        console.log('📊 Response structure:', Object.keys(rawData || {}));
         return data;
     }
 
-    // Group results by NORMALIZED biomarker name to consolidate historical data
-    // This handles variations like "Omega 3 Total" vs "Omega-3 Total" vs "Omega 3 Total / OmegaCheck"
-    const biomarkerGroups = new Map();
-    
-    allBiomarkerResults.forEach(result => {
-        const originalName = result.biomarkerName?.trim();
-        if (!originalName) return;
-        
-        const normalizedName = normalizeBiomarkerName(originalName);
-        
-        if (!biomarkerGroups.has(normalizedName)) {
-            biomarkerGroups.set(normalizedName, { 
-                results: [], 
-                apiCategory: null,
-                originalNames: new Set() // Track all original name variations
-            });
-        }
-        const group = biomarkerGroups.get(normalizedName);
-        group.results.push(result);
-        group.originalNames.add(originalName);
-        
-        // Capture API category if available (use first one found)
-        if (!group.apiCategory && result.apiCategory) {
-            group.apiCategory = result.apiCategory;
-        }
-    });
-    
-    console.log(`📊 Found ${biomarkerGroups.size} unique biomarkers after normalization`);
+    console.log(`📊 Processing ${records.length} biomarker records...`);
 
-    // Process each unique biomarker with ALL its historical values
-    biomarkerGroups.forEach((group, normalizedName) => {
-        // Use the best display name from all variations
-        const displayName = getBestDisplayName([...group.originalNames]);
+    records.forEach((record, index) => {
         try {
-            const biomarker = createConsolidatedBiomarker(group.results, displayName);
-            if (biomarker) {
-                // Use API-provided category if available (mapped to internal name), otherwise fall back to keyword matching
-                let categoryName = group.apiCategory ? mapApiCategoryToInternal(group.apiCategory) : null;
-                if (!categoryName) {
-                    categoryName = getBiomarkerCategoryFromName(displayName) || 'General';
-                }
-                
-                // Store the category on the biomarker for reference
-                biomarker.category = categoryName;
-                
-                if (!data.categories[categoryName]) {
-                    data.categories[categoryName] = {
-                        biomarkers: [],
-                        count: 0,
-                        outOfRange: 0
-                    };
-                }
-                
-                data.categories[categoryName].biomarkers.push(biomarker);
-                data.categories[categoryName].count++;
-                
-                // Update summary
-                data.summary.total++;
-                if (biomarker.status === 'In Range') {
-                    data.summary.inRange++;
-                } else if (biomarker.status === 'Out of Range') {
-                    data.summary.outOfRange++;
-                    data.categories[categoryName].outOfRange++;
-                }
-                
-                if (group.apiCategory) {
-                    console.log(`📂 Categorized "${displayName}" as "${categoryName}" (from API)`);
-                }
+            const biomarkerName = record.biomarker?.name;
+            if (!biomarkerName) {
+                console.warn(`⚠️ Record ${index} has no biomarker name`);
+                return;
             }
+
+            // Get category from API (authoritative source)
+            // The category is in biomarker.categories[0].categoryName
+            let categoryName = record.biomarker?.categories?.[0]?.categoryName;
+            
+            // Map to internal names for UI consistency
+            if (categoryName) {
+                categoryName = mapApiCategoryToInternal(categoryName);
+            } else {
+                // Fallback for the ~7 biomarkers without categories (infectious disease tests)
+                categoryName = getBiomarkerCategoryFromName(biomarkerName);
+                console.log(`📂 "${biomarkerName}" -> "${categoryName}" (fallback - no API category)`);
+            }
+
+            // Build historical values from the structured data
+            // Each result has its own inRange field which is the authoritative source
+            const historicalValues = [];
+            
+            // Add current result
+            if (record.currentResult) {
+                historicalValues.push({
+                    date: normalizeDate(record.currentResult.dateOfService),
+                    value: record.currentResult.displayResult || record.currentResult.calculatedResult,
+                    unit: record.units || '',
+                    status: record.currentResult.inRange ? 'In Range' : 'Out of Range',
+                    inRange: record.currentResult.inRange,
+                    riskLevel: record.currentResult.riskLevel
+                });
+            }
+            
+            // Add previous result
+            if (record.previousResult) {
+                historicalValues.push({
+                    date: normalizeDate(record.previousResult.dateOfService),
+                    value: record.previousResult.displayResult || record.previousResult.calculatedResult,
+                    unit: record.units || '',
+                    status: record.previousResult.inRange ? 'In Range' : 'Out of Range',
+                    inRange: record.previousResult.inRange,
+                    riskLevel: record.previousResult.riskLevel
+                });
+            }
+            
+            // Add past results
+            if (Array.isArray(record.pastResults)) {
+                record.pastResults.forEach(past => {
+                    historicalValues.push({
+                        date: normalizeDate(past.dateOfService),
+                        value: past.displayResult || past.calculatedResult,
+                        unit: record.units || '',
+                        status: past.inRange ? 'In Range' : 'Out of Range',
+                        inRange: past.inRange,
+                        riskLevel: past.riskLevel
+                    });
+                });
+            }
+
+            // Sort historical values by date (most recent first)
+            historicalValues.sort((a, b) => {
+                if (!a.date || !b.date) return 0;
+                return new Date(b.date) - new Date(a.date);
+            });
+
+            // Determine current status from currentResult.inRange (authoritative source)
+            // outOfRangeType tells us WHY something is out of range, not WHETHER it is
+            let currentStatus = 'In Range';
+            if (record.currentResult) {
+                currentStatus = record.currentResult.inRange ? 'In Range' : 'Out of Range';
+            } else if (record.outOfRangeType === 'above' || record.outOfRangeType === 'below') {
+                // Fallback: if no currentResult, use outOfRangeType for above/below
+                currentStatus = 'Out of Range';
+            }
+            
+            // Determine if reference range is available
+            const hasReferenceRange = record.rangeString && record.rangeString.trim() !== '';
+            
+            // Detect if this is a qualitative/threshold-based result
+            const displayValue = record.currentResult?.displayResult || record.currentResult?.calculatedResult || '';
+            const displayStr = String(displayValue).toUpperCase();
+            const isQualitativeResult = /NEG|POS|REACTIVE|DETECTED|^<|^>/i.test(displayValue);
+            const resultType = isQualitativeResult ? 'qualitative' : 'quantitative';
+            
+            // Determine qualitative interpretation
+            const isNegative = /NEG|NON-REACTIVE|NOT DETECTED/i.test(displayStr);
+            const isPositive = /(?<!NON[ -]?)REACTIVE|(?<!NOT )DETECTED/i.test(displayStr) && !isNegative;
+            const isBelowThreshold = String(displayValue).trim().startsWith('<');
+            const isAboveThreshold = String(displayValue).trim().startsWith('>');
+            
+            // Create biomarker object
+            const biomarker = {
+                name: biomarkerName,
+                description: record.biomarker?.oneLineDescription || null,  // API-provided description
+                status: currentStatus,
+                value: record.currentResult?.displayResult || record.currentResult?.calculatedResult || '',
+                unit: record.units || '',
+                date: normalizeDate(record.currentResult?.dateOfService) || '',
+                referenceRange: hasReferenceRange ? record.rangeString : null,
+                hasReferenceRange: hasReferenceRange,
+                rangeContext: record.outOfRangeType,  // 'in_range', 'above', 'below', 'OTHER', 'text', etc.
+                questId: record.questBiomarkerId,
+                category: categoryName,
+                improving: record.improving || false,
+                historicalValues: historicalValues,
+                source: 'Results Report API',
+                // Qualitative result fields
+                resultType: resultType,
+                isQualitative: isQualitativeResult,
+                isNegative: isNegative,
+                isPositive: isPositive,
+                isBelowThreshold: isBelowThreshold,
+                isAboveThreshold: isAboveThreshold
+            };
+
+            // Add to category
+            if (!data.categories[categoryName]) {
+                data.categories[categoryName] = {
+                    biomarkers: [],
+                    count: 0,
+                    outOfRange: 0
+                };
+            }
+
+            data.categories[categoryName].biomarkers.push(biomarker);
+            data.categories[categoryName].count++;
+            
+            // Update summary
+            data.summary.total++;
+            if (biomarker.status === 'In Range') {
+                data.summary.inRange++;
+            } else {
+                data.summary.outOfRange++;
+                data.categories[categoryName].outOfRange++;
+            }
+            
+            if (biomarker.improving) {
+                data.summary.improving++;
+            }
+
         } catch (error) {
-            console.warn(`⚠️ Error processing biomarker "${displayName}":`, error);
+            console.warn(`⚠️ Error processing record ${index}:`, error);
         }
     });
 
@@ -440,298 +583,19 @@ function parseAPIResponse(rawData) {
         categories: Object.keys(data.categories).length,
         totalBiomarkers: data.summary.total,
         inRange: data.summary.inRange,
-        outOfRange: data.summary.outOfRange
+        outOfRange: data.summary.outOfRange,
+        improving: data.summary.improving
     });
 
     return data;
 }
 
 /**
- * Create a consolidated biomarker object from multiple results
- * Combines all historical values into a single biomarker entry
+ * Parse results-report API response for current results only
+ * Returns only the most recent result for each biomarker
  */
-function createConsolidatedBiomarker(results, biomarkerName) {
-    if (!results || results.length === 0) {
-        return null;
-    }
-    
-    // Sort by date descending (most recent first)
-    results.sort((a, b) => 
-        new Date(b.dateOfService || b.visitDate || 0) - 
-        new Date(a.dateOfService || a.visitDate || 0)
-    );
-    
-    const mostRecent = results[0];
-    
-    // Build historical values from ALL results with normalized dates
-    const allHistoricalValues = results.map(r => ({
-        date: normalizeDate(r.dateOfService || r.visitDate),
-        value: r.testResult,
-        unit: r.measurementUnits || '',
-        status: r.testResultOutOfRange ? 'Out of Range' : 'In Range',
-        inRange: !r.testResultOutOfRange,
-        visitDate: normalizeDate(r.visitDate)
-    })).filter(h => h.date); // Only include entries with valid dates
-    
-    // Deduplicate historical values with same date and value
-    // This handles cases like "Omega 3 Total" and "Omega 3 Total / OmegaCheck" having identical entries
-    const seenKeys = new Set();
-    const historicalValues = allHistoricalValues.filter(h => {
-        const key = `${h.date}|${h.value}`;
-        if (seenKeys.has(key)) {
-            return false; // Skip duplicate
-        }
-        seenKeys.add(key);
-        return true;
-    });
-    
-    const duplicatesRemoved = allHistoricalValues.length - historicalValues.length;
-    if (duplicatesRemoved > 0) {
-        console.log(`🔄 Deduplicated ${duplicatesRemoved} duplicate entries for "${biomarkerName}"`);
-    }
-    
-    const biomarker = {
-        name: biomarkerName,
-        status: mostRecent.testResultOutOfRange ? 'Out of Range' : 'In Range',
-        value: mostRecent.testResult || '',
-        unit: mostRecent.measurementUnits || '',
-        date: normalizeDate(mostRecent.dateOfService || mostRecent.visitDate) || '',
-        referenceRange: mostRecent.questReferenceRange,
-        questId: mostRecent.questBiomarkerId,
-        source: 'Final API',
-        historicalValues: historicalValues
-    };
-    
-    console.log(`🧪 Consolidated biomarker: ${biomarker.name} = ${biomarker.value} ${biomarker.unit} (${biomarker.status}) [${historicalValues.length} historical values]`);
-    return biomarker;
-}
-
-/**
- * Parse individual biomarker result from API response
- * Used for single-result extraction (extractCurrentResultsOnly)
- */
-function parseBiomarkerResult(result) {
-    if (!result || !result.biomarkerName) {
-        console.warn('⚠️ Invalid biomarker result:', result);
-        return null;
-    }
-    
-    const status = result.testResultOutOfRange ? 'Out of Range' : 'In Range';
-    const normalizedDate = normalizeDate(result.dateOfService || result.visitDate);
-    
-    const biomarker = {
-        name: result.biomarkerName,
-        status: status,
-        value: result.testResult || '',
-        unit: result.measurementUnits || '',
-        date: normalizedDate || '',
-        historicalValues: [],
-        source: 'Final API',
-        questId: result.questBiomarkerId,
-        dateOfService: normalizeDate(result.dateOfService),
-        visitDate: normalizeDate(result.visitDate),
-        referenceRange: result.questReferenceRange
-    };
-
-    // Create historical entry for this result with consistent structure
-    if (normalizedDate) {
-        biomarker.historicalValues.push({
-            date: normalizedDate,
-            value: result.testResult,
-            unit: result.measurementUnits || '',
-            status: status,  // Include status string for consistency
-            inRange: !result.testResultOutOfRange,
-            visitDate: normalizeDate(result.visitDate)
-        });
-    }
-
-    console.log(`🧪 Parsed biomarker: ${biomarker.name} = ${biomarker.value} ${biomarker.unit} (${biomarker.status}) [${biomarker.date}]`);
-    return biomarker;
-}
-
-/**
- * Get biomarker category from biomarker name
- * Uses priority-based matching to avoid misclassification
- */
-function getBiomarkerCategoryFromName(biomarkerName) {
-    if (!biomarkerName) return 'General';
-    
-    const name = biomarkerName.toLowerCase();
-    
-    // HIGH PRIORITY: Check urinalysis suffix FIRST to avoid mismatches
-    // e.g., "Hyaline Casts - Urine" should NOT match "ast" -> Liver
-    if (name.includes('- urine') || name.endsWith(' urine')) {
-        console.log(`📂 Categorized "${biomarkerName}" as "Urinalysis" (urine suffix)`);
-        return 'Urinalysis';
-    }
-    
-    // Electrolytes category
-    const electrolytes = ['sodium', 'potassium', 'chloride', 'carbon dioxide', 'bicarbonate'];
-    for (const e of electrolytes) {
-        if (name === e || name.startsWith(e + ' ') || name.startsWith(e + ',')) {
-            console.log(`📂 Categorized "${biomarkerName}" as "Electrolytes" (matched: ${e})`);
-            return 'Electrolytes';
-        }
-    }
-    
-    // Enhanced categorization based on actual Function Health biomarker names
-    // Using more specific matching to avoid false positives
-    const categoryMap = {
-        // Heart & Cardiovascular
-        'cholesterol': 'Heart & Cardiovascular', 'hdl': 'Heart & Cardiovascular', 'ldl': 'Heart & Cardiovascular', 
-        'triglyceride': 'Heart & Cardiovascular', 'apolipoprotein': 'Heart & Cardiovascular', 'lp-pla2': 'Heart & Cardiovascular',
-        'lipoprotein': 'Heart & Cardiovascular', 'lp(a)': 'Heart & Cardiovascular',
-        'pcad': 'Heart & Cardiovascular', 'pcec': 'Heart & Cardiovascular', 'oxldl': 'Heart & Cardiovascular',
-        'trimethylamine': 'Heart & Cardiovascular', 'homocysteine': 'Heart & Cardiovascular',
-        
-        // Blood & Hematology (use more specific patterns)
-        'hemoglobin': 'Blood & Hematology', 'hematocrit': 'Blood & Hematology', 'platelet': 'Blood & Hematology',
-        'white blood cell': 'Blood & Hematology', 'red blood cell': 'Blood & Hematology', 
-        'neutrophil': 'Blood & Hematology', 'lymphocyte': 'Blood & Hematology', 'monocyte': 'Blood & Hematology',
-        'eosinophil': 'Blood & Hematology', 'basophil': 'Blood & Hematology', 'mcv': 'Blood & Hematology',
-        'mch': 'Blood & Hematology', 'mchc': 'Blood & Hematology', 'rdw': 'Blood & Hematology', 'mpv': 'Blood & Hematology',
-        'abo group': 'Blood & Hematology', 'blood type': 'Blood & Hematology', 'rhesus': 'Blood & Hematology', 'rh factor': 'Blood & Hematology',
-        
-        // Metabolic & Diabetes
-        'glucose': 'Metabolic & Diabetes', 'insulin': 'Metabolic & Diabetes', 'hemoglobin a1c': 'Metabolic & Diabetes',
-        'hba1c': 'Metabolic & Diabetes', 'adiponectin': 'Metabolic & Diabetes', 'uric acid': 'Metabolic & Diabetes',
-        'c-peptide': 'Metabolic & Diabetes',
-        
-        // Kidney & Renal
-        'creatinine': 'Kidney & Renal', 'kidney': 'Kidney & Renal', 'urea': 'Kidney & Renal', 'bun': 'Kidney & Renal',
-        'egfr': 'Kidney & Renal', 'glomerular': 'Kidney & Renal', 'cystatin': 'Kidney & Renal',
-        
-        // Liver (use word boundaries to avoid matching "Hyaline Casts")
-        'liver': 'Liver', 'alanine transaminase': 'Liver', 'aspartate aminotransferase': 'Liver', 
-        'alkaline phosphatase': 'Liver', 'bilirubin': 'Liver', 'albumin': 'Liver', 
-        'total protein': 'Liver', 'globulin': 'Liver', 'ggtp': 'Liver', 'ggt': 'Liver',
-        'gamma-glutamyl': 'Liver', '(alt)': 'Liver', '(ast)': 'Liver', '(alp)': 'Liver',
-        'albumin/globulin': 'Liver', 'a/g ratio': 'Liver',
-        
-        // Thyroid
-        'thyroid': 'Thyroid', 'tsh': 'Thyroid', 'triiodothyronine': 'Thyroid', 'thyroxine': 'Thyroid',
-        
-        // Hormones
-        'testosterone': 'Hormones', 'estradiol': 'Hormones', 'cortisol': 'Hormones', 'dhea': 'Hormones',
-        'progesterone': 'Hormones', 'follicle stimulating': 'Hormones', 'luteinizing hormone': 'Hormones',
-        'prolactin': 'Hormones', 'shbg': 'Hormones', 'sex hormone binding': 'Hormones',
-        'androstenedione': 'Hormones', 'dihydrotestosterone': 'Hormones',
-        'insulin-like growth factor': 'Hormones', 'igf-1': 'Hormones', 'igf': 'Hormones',
-        
-        // Nutrients & Vitamins (also matches API category "Nutrients")
-        'vitamin': 'Nutrients', 'iron': 'Nutrients', 'calcium': 'Nutrients',
-        'magnesium': 'Nutrients', 'zinc': 'Nutrients', 'b12': 'Nutrients',
-        'folate': 'Nutrients', 'ferritin': 'Nutrients', 'omega': 'Nutrients',
-        'arachidonic': 'Nutrients', 'epa': 'Nutrients', 'dha': 'Nutrients',
-        'fatty acid': 'Nutrients', 'linoleic': 'Nutrients', 'alpha-linolenic': 'Nutrients',
-        
-        // Infectious Disease & STDs
-        'herpes': 'Infectious Disease', 'hiv': 'Infectious Disease', 'chlamydia': 'Infectious Disease',
-        'gonorrhoea': 'Infectious Disease', 'syphilis': 'Infectious Disease', 'trichomonas': 'Infectious Disease',
-        'hepatitis': 'Infectious Disease',
-        
-        // Inflammation & Immune
-        'c-reactive': 'Inflammation', 'crp': 'Inflammation', 'esr': 'Inflammation', 'sed rate': 'Inflammation',
-        'fibrinogen': 'Inflammation', 'myeloperoxidase': 'Inflammation', 'ana': 'Inflammation',
-        'antinuclear': 'Inflammation',
-        
-        // Environmental Toxins & Heavy Metals
-        'mercury': 'Environmental Toxins', 'lead': 'Environmental Toxins', 'arsenic': 'Environmental Toxins',
-        'cadmium': 'Environmental Toxins', 'thallium': 'Environmental Toxins', 'heavy metal': 'Environmental Toxins',
-        
-        // Autoimmunity
-        'antibody': 'Autoimmunity', 'autoantibody': 'Autoimmunity', 'centromere': 'Autoimmunity',
-        'anti-dsdna': 'Autoimmunity', 'anti-smith': 'Autoimmunity', 'scleroderma': 'Autoimmunity',
-        'lupus': 'Autoimmunity', 'rheumatoid factor': 'Autoimmunity', 'sjogren': 'Autoimmunity',
-        'jo-1': 'Autoimmunity', 'scl-70': 'Autoimmunity', 'ssa': 'Autoimmunity', 'ssb': 'Autoimmunity',
-        'rnp': 'Autoimmunity', 'chromatin': 'Autoimmunity', 'ribosomal': 'Autoimmunity',
-        'cardiolipin': 'Autoimmunity', 'phospholipid': 'Autoimmunity', 'beta-2 glycoprotein': 'Autoimmunity',
-        
-        // Reproductive Health (sex-specific)
-        'prostate': 'Reproductive Health', 'psa': 'Reproductive Health',
-        'ovarian': 'Reproductive Health', 'amh': 'Reproductive Health', 'anti-mullerian': 'Reproductive Health',
-        
-        // Pancreas
-        'amylase': 'Pancreas', 'lipase': 'Pancreas', 'pancreas': 'Pancreas', 'pancreatic': 'Pancreas',
-        
-        // Stress & Aging
-        'z score': 'Stress & Aging', 'dhea sulfate': 'Stress & Aging', 'dhea-s': 'Stress & Aging'
-    };
-    
-    for (const [keyword, category] of Object.entries(categoryMap)) {
-        if (name.includes(keyword)) {
-            console.log(`📂 Categorized "${biomarkerName}" as "${category}" (matched: ${keyword})`);
-            return category;
-        }
-    }
-    
-    console.log(`📂 Categorized "${biomarkerName}" as "General" (no match found)`);
-    return 'General';
-}
-
-/**
- * Extract only the most recent biomarker data (current results only)
- */
-async function extractCurrentResultsOnly() {
-    console.log('⚡ Starting current-only API extraction...');
-    
-    try {
-        // Get the working token
-        const token = getWorkingToken();
-        console.log('🔐 Using working token from userData.idToken');
-        
-        // Make the API request with exact headers that work
-        const apiUrl = 'https://production-member-app-mid-lhuqotpy2a-ue.a.run.app/api/v1/requisitions?pending=false';
-        console.log('📡 Requesting current biomarker data...');
-        
-        const response = await fetch(apiUrl, {
-            method: 'GET',
-            credentials: 'include',
-            headers: {
-                'Accept': 'application/json, text/plain, */*',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Authorization': `Bearer ${token}`,
-                'Origin': 'https://my.functionhealth.com',
-                'Referer': 'https://my.functionhealth.com/',
-                'Sec-Fetch-Dest': 'empty',
-                'Sec-Fetch-Mode': 'cors',
-                'Sec-Fetch-Site': 'cross-site',
-                'User-Agent': navigator.userAgent,
-                'fe-app-version': '0.84.25',
-                'x-backend-skip-cache': 'true'
-            }
-        });
-        
-        console.log(`📊 API Response: ${response.status} ${response.statusText}`);
-        
-        if (!response.ok) {
-            throw new Error(`API request failed: ${response.status} ${response.statusText}`);
-        }
-        
-        const rawData = await response.json();
-        console.log('✅ Raw data received, filtering to current results...');
-        
-        // Parse the data and filter to current results only
-        const parsedData = parseAPIResponseCurrentOnly(rawData);
-        
-        console.log('🎯 Current-only extraction complete:', {
-            categories: Object.keys(parsedData.categories).length,
-            totalBiomarkers: Object.values(parsedData.categories).reduce((sum, cat) => sum + cat.biomarkers.length, 0)
-        });
-        
-        return parsedData;
-        
-    } catch (error) {
-        console.error('❌ Current-only extraction failed:', error);
-        throw error;
-    }
-}
-
-/**
- * Parse API response and filter to only the most recent result for each biomarker
- */
-function parseAPIResponseCurrentOnly(rawData) {
-    console.log('🔄 Parsing API response for current results only...');
+function parseResultsReportCurrentOnly(rawData) {
+    console.log('🔄 Parsing results-report API for current results only...');
     
     const data = {
         categories: {},
@@ -742,218 +606,114 @@ function parseAPIResponseCurrentOnly(rawData) {
             total: 0
         },
         extractedAt: new Date().toISOString(),
-        source: 'Final API Extractor (Current Only)'
+        source: 'Results Report API (Current Only)'
     };
 
-    // Extract all biomarker results from the nested structure
-    let allBiomarkerResults = [];
+    // Extract biomarkerResultsRecord from the response
+    const records = rawData?.data?.biomarkerResultsRecord;
     
-    // STEP 1: Build a GLOBAL lookup map of biomarker ID -> category/name
-    // This scans ALL requisitions and visits FIRST before processing results
-    const globalBiomarkerCategoryMap = new Map();
-    const globalBiomarkerNameMap = new Map();
-    
-    if (Array.isArray(rawData)) {
-        rawData.forEach(requisition => {
-            if (requisition.visits && Array.isArray(requisition.visits)) {
-                requisition.visits.forEach(visit => {
-                    if (visit.biomarkers && Array.isArray(visit.biomarkers)) {
-                        visit.biomarkers.forEach(entry => {
-                            const biomarkerId = entry.biomarker?.id;
-                            const category = entry.biomarker?.categories?.[0]?.categoryName || null;
-                            const name = entry.biomarker?.name || '';
-                            
-                            if (biomarkerId) {
-                                if (category && !globalBiomarkerCategoryMap.has(biomarkerId)) {
-                                    globalBiomarkerCategoryMap.set(biomarkerId, category);
-                                }
-                                if (name && !globalBiomarkerNameMap.has(biomarkerId)) {
-                                    globalBiomarkerNameMap.set(biomarkerId, name);
-                                }
-                            }
-                        });
-                    }
-                });
-            }
-        });
-    }
-    
-    console.log(`📂 Built global biomarker lookup: ${globalBiomarkerCategoryMap.size} categories`);
-    
-    // STEP 2: Now process all results using the global lookup map
-    if (Array.isArray(rawData)) {
-        rawData.forEach((requisition, reqIndex) => {
-            console.log(`📋 Processing requisition ${reqIndex + 1} for current results`);
-            
-            if (requisition.visits && Array.isArray(requisition.visits)) {
-                requisition.visits.forEach((visit, visitIndex) => {
-                    // Check for biomarker entries with parent biomarker info (new API structure)
-                    if (visit.biomarkers && Array.isArray(visit.biomarkers)) {
-                        visit.biomarkers.forEach(entry => {
-                            const apiCategory = entry.biomarker?.categories?.[0]?.categoryName || null;
-                            const biomarkerName = entry.biomarker?.name || '';
-                            
-                            if (entry.biomarkerResults && Array.isArray(entry.biomarkerResults)) {
-                                entry.biomarkerResults.forEach(result => {
-                                    allBiomarkerResults.push({
-                                        ...result,
-                                        biomarkerName: result.biomarkerName || biomarkerName,
-                                        apiCategory: apiCategory,
-                                        visitDate: visit.visitDate,
-                                        visitId: visit.id
-                                    });
-                                });
-                            }
-                        });
-                    }
-                    
-                    // Also check for direct biomarkerResults (legacy structure)
-                    if (visit.biomarkerResults && Array.isArray(visit.biomarkerResults)) {
-                        visit.biomarkerResults.forEach(result => {
-                            const alreadyAdded = allBiomarkerResults.some(r => 
-                                r.id === result.id || 
-                                (r.biomarkerName === result.biomarkerName && 
-                                 r.dateOfService === result.dateOfService &&
-                                 r.testResult === result.testResult)
-                            );
-                            
-                            if (!alreadyAdded) {
-                                // Use GLOBAL lookup map to find category
-                                const biomarkerId = result.biomarkerId;
-                                const apiCategory = biomarkerId ? globalBiomarkerCategoryMap.get(biomarkerId) : null;
-                                const parentName = biomarkerId ? globalBiomarkerNameMap.get(biomarkerId) : null;
-                                
-                                allBiomarkerResults.push({
-                                    ...result,
-                                    biomarkerName: result.biomarkerName || parentName || '',
-                                    apiCategory: apiCategory,
-                                    visitDate: visit.visitDate,
-                                    visitId: visit.id
-                                });
-                            }
-                        });
-                    }
-                });
-            }
-        });
-    }
-
-    console.log(`📊 Total biomarker results found: ${allBiomarkerResults.length}`);
-
-    if (allBiomarkerResults.length === 0) {
-        console.warn('⚠️ No biomarker results found in API response');
+    if (!Array.isArray(records)) {
+        console.warn('⚠️ No biomarkerResultsRecord found in API response');
         return data;
     }
 
-    // Group by NORMALIZED biomarker name and get the most recent result for each
-    // This handles variations like "Omega 3 Total" vs "Omega-3 Total" vs "Omega 3 Total / OmegaCheck"
-    const biomarkerGroups = {};
-    
-    allBiomarkerResults.forEach(result => {
-        const originalName = result.biomarkerName;
-        if (!originalName) return;
-        
-        // Normalize biomarker name to handle variations
-        const normalizedName = normalizeBiomarkerName(originalName);
-        
-        if (!biomarkerGroups[normalizedName]) {
-            biomarkerGroups[normalizedName] = { 
-                results: [], 
-                apiCategory: null,
-                originalNames: new Set()
-            };
-        }
-        
-        biomarkerGroups[normalizedName].results.push(result);
-        biomarkerGroups[normalizedName].originalNames.add(originalName);
-        
-        // Capture API category if available
-        if (!biomarkerGroups[normalizedName].apiCategory && result.apiCategory) {
-            biomarkerGroups[normalizedName].apiCategory = result.apiCategory;
-        }
-    });
-    
-    console.log(`📊 Found ${Object.keys(biomarkerGroups).length} unique biomarkers after normalization`);
-    
-    // For each biomarker, get the most recent result
-    const currentResults = [];
-    
-    Object.entries(biomarkerGroups).forEach(([normalizedName, group]) => {
-        // Sort by date (most recent first)
-        const sortedResults = group.results.sort((a, b) => {
-            const dateA = new Date(a.dateOfService || a.visitDate || '1900-01-01');
-            const dateB = new Date(b.dateOfService || b.visitDate || '1900-01-01');
-            return dateB - dateA; // Most recent first
-        });
-        
-        const mostRecent = sortedResults[0];
-        // Use the best display name from all variations
-        const displayName = getBestDisplayName([...group.originalNames]);
-        mostRecent.biomarkerName = displayName; // Use clean display name
-        mostRecent.apiCategory = group.apiCategory;
-        currentResults.push(mostRecent);
-        
-        const variantCount = group.originalNames.size;
-        if (variantCount > 1) {
-            console.log(`📅 ${displayName}: Merged ${variantCount} name variants, using result from ${mostRecent.dateOfService || mostRecent.visitDate}`);
-        } else {
-            console.log(`📅 ${displayName}: Using result from ${mostRecent.dateOfService || mostRecent.visitDate} (${sortedResults.length} total results available)`);
-        }
-    });
-    
-    console.log(`✅ Filtered to ${currentResults.length} current results`);
+    console.log(`📊 Processing ${records.length} biomarker records for current values...`);
 
-    // Process each current biomarker result with duplicate prevention
-    const processedBiomarkers = new Set(); // Track processed biomarker names
-    
-    currentResults.forEach((result, index) => {
+    records.forEach((record, index) => {
         try {
-            const biomarker = parseBiomarkerResult(result);
-            if (biomarker) {
-                const normalizedName = biomarker.name.trim();
-                
-                // Double-check for duplicates (safety net)
-                if (processedBiomarkers.has(normalizedName)) {
-                    console.warn(`⚠️ Duplicate biomarker detected and skipped: ${normalizedName}`);
-                    return;
-                }
-                
-                processedBiomarkers.add(normalizedName);
-                
-                // Use API-provided category if available (mapped to internal name), otherwise fall back to keyword matching
-                let categoryName = result.apiCategory ? mapApiCategoryToInternal(result.apiCategory) : null;
-                if (!categoryName) {
-                    categoryName = getBiomarkerCategoryFromName(result.biomarkerName) || 'General';
-                }
-                
-                // Store the category on the biomarker
-                biomarker.category = categoryName;
-                
-                if (!data.categories[categoryName]) {
-                    data.categories[categoryName] = {
-                        biomarkers: [],
-                        count: 0,
-                        outOfRange: 0
-                    };
-                }
-                
-                data.categories[categoryName].biomarkers.push(biomarker);
-                data.categories[categoryName].count++;
-                
-                // Update summary
-                data.summary.total++;
-                if (biomarker.status === 'In Range') {
-                    data.summary.inRange++;
-                } else if (biomarker.status === 'Out of Range') {
-                    data.summary.outOfRange++;
-                    data.categories[categoryName].outOfRange++;
-                }
-                
-                const categorySource = result.apiCategory ? 'from API' : 'from keywords';
-                console.log(`✅ Added: ${normalizedName} to "${categoryName}" (${categorySource})`);
+            const biomarkerName = record.biomarker?.name;
+            if (!biomarkerName) return;
+
+            // Skip if no current result
+            if (!record.currentResult) {
+                console.log(`⏭️ Skipping "${biomarkerName}" - no current result`);
+                return;
             }
+
+            // Get category from API
+            let categoryName = record.biomarker?.categories?.[0]?.categoryName;
+            if (categoryName) {
+                categoryName = mapApiCategoryToInternal(categoryName);
+            } else {
+                categoryName = getBiomarkerCategoryFromName(biomarkerName);
+            }
+
+            // Determine current status from currentResult.inRange (authoritative source)
+            const currentStatus = record.currentResult.inRange ? 'In Range' : 'Out of Range';
+            
+            // Determine if reference range is available
+            const hasReferenceRange = record.rangeString && record.rangeString.trim() !== '';
+            
+            // Detect if this is a qualitative/threshold-based result
+            const displayValue = record.currentResult.displayResult || record.currentResult.calculatedResult || '';
+            const displayStr = String(displayValue).toUpperCase();
+            const isQualitativeResult = /NEG|POS|REACTIVE|DETECTED|^<|^>/i.test(displayValue);
+            const resultType = isQualitativeResult ? 'qualitative' : 'quantitative';
+            
+            // Determine qualitative interpretation
+            const isNegative = /NEG|NON-REACTIVE|NOT DETECTED/i.test(displayStr);
+            const isPositive = /(?<!NON[ -]?)REACTIVE|(?<!NOT )DETECTED/i.test(displayStr) && !isNegative;
+            const isBelowThreshold = String(displayValue).trim().startsWith('<');
+            const isAboveThreshold = String(displayValue).trim().startsWith('>');
+            
+            // Create biomarker object with only current result
+            const biomarker = {
+                name: biomarkerName,
+                description: record.biomarker?.oneLineDescription || null,  // API-provided description
+                status: currentStatus,
+                value: record.currentResult.displayResult || record.currentResult.calculatedResult || '',
+                unit: record.units || '',
+                date: normalizeDate(record.currentResult.dateOfService) || '',
+                referenceRange: hasReferenceRange ? record.rangeString : null,
+                hasReferenceRange: hasReferenceRange,
+                rangeContext: record.outOfRangeType,  // 'in_range', 'above', 'below', 'OTHER', 'text', etc.
+                questId: record.questBiomarkerId,
+                category: categoryName,
+                improving: record.improving || false,
+                historicalValues: [{
+                    date: normalizeDate(record.currentResult.dateOfService),
+                    value: record.currentResult.displayResult || record.currentResult.calculatedResult,
+                    unit: record.units || '',
+                    status: currentStatus,
+                    inRange: record.currentResult.inRange
+                }],
+                source: 'Results Report API (Current Only)',
+                // Qualitative result fields
+                resultType: resultType,
+                isQualitative: isQualitativeResult,
+                isNegative: isNegative,
+                isPositive: isPositive,
+                isBelowThreshold: isBelowThreshold,
+                isAboveThreshold: isAboveThreshold
+            };
+
+            // Add to category
+            if (!data.categories[categoryName]) {
+                data.categories[categoryName] = {
+                    biomarkers: [],
+                    count: 0,
+                    outOfRange: 0
+                };
+            }
+
+            data.categories[categoryName].biomarkers.push(biomarker);
+            data.categories[categoryName].count++;
+            
+            // Update summary
+            data.summary.total++;
+            if (biomarker.status === 'In Range') {
+                data.summary.inRange++;
+            } else {
+                data.summary.outOfRange++;
+                data.categories[categoryName].outOfRange++;
+            }
+            
+            if (biomarker.improving) {
+                data.summary.improving++;
+            }
+
         } catch (error) {
-            console.warn(`⚠️ Error parsing current biomarker result ${index}:`, error);
+            console.warn(`⚠️ Error processing record ${index}:`, error);
         }
     });
 
@@ -967,8 +727,94 @@ function parseAPIResponseCurrentOnly(rawData) {
     return data;
 }
 
+// =============================================================================
+// MAIN EXTRACTION FUNCTIONS
+// =============================================================================
+
+/**
+ * Extract biomarker data using the results-report API
+ * Uses dynamic endpoint discovery with fallback support
+ */
+async function extractViaFinalAPI() {
+    console.log('⚡ Starting final API extraction...');
+    
+    try {
+        // Get the working token
+        const token = getWorkingToken();
+        console.log('🔐 Using working token from userData.idToken');
+        
+        // Use the results-report endpoint (has category data)
+        const endpoint = KNOWN_ENDPOINTS.resultsReport;
+        console.log('📡 Requesting biomarker data from results-report API...');
+        
+        const response = await fetchWithFallback(endpoint, token);
+        
+        console.log(`📊 API Response: ${response.status} ${response.statusText}`);
+        
+        const rawData = await response.json();
+        console.log('✅ Raw data received, parsing...');
+        
+        // Parse using results-report format (has categories)
+        const parsedData = parseResultsReportResponse(rawData);
+        
+        console.log('🎯 Final extraction complete:', {
+            categories: Object.keys(parsedData.categories).length,
+            totalBiomarkers: parsedData.summary.total
+        });
+        
+        return parsedData;
+        
+    } catch (error) {
+        console.error('❌ Final extraction failed:', error);
+        throw error;
+    }
+}
+
+/**
+ * Extract only the most recent biomarker data (current results only)
+ * Uses results-report API with current-only parsing
+ */
+async function extractCurrentResultsOnly() {
+    console.log('⚡ Starting current-only API extraction...');
+    
+    try {
+        // Get the working token
+        const token = getWorkingToken();
+        console.log('🔐 Using working token from userData.idToken');
+        
+        // Use the results-report endpoint
+        const endpoint = KNOWN_ENDPOINTS.resultsReport;
+        console.log('📡 Requesting current biomarker data from results-report API...');
+        
+        const response = await fetchWithFallback(endpoint, token);
+        
+        console.log(`📊 API Response: ${response.status} ${response.statusText}`);
+        
+        const rawData = await response.json();
+        console.log('✅ Raw data received, filtering to current results...');
+        
+        // Parse with current-only filter
+        const parsedData = parseResultsReportCurrentOnly(rawData);
+        
+        console.log('🎯 Current-only extraction complete:', {
+            categories: Object.keys(parsedData.categories).length,
+            totalBiomarkers: parsedData.summary.total
+        });
+        
+        return parsedData;
+        
+    } catch (error) {
+        console.error('❌ Current-only extraction failed:', error);
+        throw error;
+    }
+}
+
+// =============================================================================
+// EXPORTS
+// =============================================================================
+
 // Make functions available globally
 window.extractViaFinalAPI = extractViaFinalAPI;
 window.extractCurrentResultsOnly = extractCurrentResultsOnly;
 
-console.log('✅ Final API Extractor loaded! Ready for lightning-fast extraction!');
+console.log('✅ Final API Extractor loaded! Using results-report API with dynamic endpoint discovery.');

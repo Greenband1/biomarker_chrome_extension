@@ -2,29 +2,29 @@
 
 A Chrome extension that extracts biomarker data from health services into exportable formats (CSV, JSON, table).
 
-![Extension Version](https://img.shields.io/badge/version-2.4.0-blue.svg)
+![Extension Version](https://img.shields.io/badge/version-2.6.0-blue.svg)
 ![Chrome Extension](https://img.shields.io/badge/platform-Chrome%20Extension-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-## 🚀 What's New (v2.4.0)
+## 🚀 What's New (v2.6.0)
 
-### Complete UI Redesign - Health-Focused Identity
-- **New Color Palette** - Replaced generic purple gradient with calming medical/wellness aesthetic (soft teals, warm neutrals, terracotta accents)
-- **Premium Typography** - DM Sans font family for a distinctive, professional look
-- **Custom SVG Icons** - Replaced all emoji icons with cohesive SVG icon set matching the visual overlay style
-- **Micro-Interactions** - Button ripple effects and smooth animations for polished feel
-- **Refined Notifications** - Bottom toast-style notifications with smart timing (less intrusive, more informative)
+### API & Data Improvements
+- **New Results-Report API** - Switched to authoritative `/api/v1/results-report` endpoint for accurate categorization
+- **Dynamic API Discovery** - Automatically discovers API endpoints with fallback mechanisms
+- **Improved Categorization** - 96% of biomarkers now use API-provided categories (vs. keyword matching)
+- **Reference Range in CSV** - Export now includes reference range column for easier analysis
 
-### UX Improvements
-- **Cleaner Layout** - Warm cream background with refined shadows and spacing
-- **Streamlined Flow** - Removed verbose validation messages; button loading state provides feedback
-- **Consistent Styling** - All components now share a unified visual language with the visual overlay
+### Visual View Enhancements
+- **Fixed Sparkline Positioning** - Out-of-range values now correctly appear outside the green zone
+- **Better Qualitative Results** - Improved display for results like "NEG", "NON-REACTIVE", etc.
+- **API-Powered Tooltips** - Info button now shows descriptions from Function Health API
+- **Native Print/PDF** - Print button uses browser's native print for direct PDF export
 
-### Previous Features (v2.3.0)
+### Previous Features (v2.5.x)
+- Complete UI redesign with health-focused color palette
+- Premium DM Sans typography and custom SVG icons
 - Interactive trend lines in Visual View
-- API category support from Function Health
 - Smart biomarker grouping and duplicate elimination
-- Support for Nutrients, Electrolytes, Urinalysis, and Inflammation categories
 
 ## ⚠️ Legal Disclaimer
 
@@ -100,10 +100,10 @@ This extension is an independent tool created to help users export their own bio
 
 ### CSV/Table Output
 ```
-Category,Biomarker,Status,Value,Unit,Date
-Heart & Cardiovascular,HDL Cholesterol,In Range,65,mg/dL,2025-07-25
-Kidney & Renal,Creatinine,In Range,0.9,mg/dL,2025-07-25
-Infectious Disease,Herpes Simplex Virus 1,In Range,<0.90,,2025-07-25
+Category,Biomarker,Status,Value,Unit,Reference Range,Date
+Heart & Cardiovascular,HDL Cholesterol,In Range,65,mg/dL,>40,2025-07-25
+Kidney & Renal,Creatinine,In Range,0.9,mg/dL,0.7-1.3,2025-07-25
+Infectious Disease,Herpes Simplex Virus 1,In Range,<0.90,,<0.90,2025-07-25
 ```
 
 ### Biomarker Categories
@@ -130,7 +130,8 @@ Infectious Disease,Herpes Simplex Virus 1,In Range,<0.90,,2025-07-25
 - **Background Processing** - Efficient data parsing and categorization
 
 ### Data Sources
-- Primary: Function Health REST API (`/api/v1/requisitions`)
+- Primary: Function Health REST API (`/api/v1/results-report`)
+- Fallback: Dynamic API discovery with endpoint caching
 - Authentication: Uses existing Function Health session tokens
 - No data is stored or transmitted outside your browser
 

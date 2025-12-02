@@ -99,3 +99,9 @@ jspm_packages/
 # DynamoDB Local files
 .dynamodb/
 .vercel
+
+# API response files (contain user data)
+api-requisitions-pending.json
+api-results-report.json
+api_response_function_health.txt
+*.log

@@ -242,12 +242,15 @@ function convertToCSV(data) {
     const rows = [];
     
     // Header row
-    rows.push(['Category', 'Biomarker', 'Status', 'Value', 'Unit', 'Date']);
+    rows.push(['Category', 'Biomarker', 'Status', 'Value', 'Unit', 'Reference Range', 'Date']);
     
     // Data rows - collect all biomarkers with category info
     const allBiomarkers = [];
     Object.entries(data.categories).forEach(([categoryName, category]) => {
         category.biomarkers.forEach(biomarker => {
+            // Get reference range from biomarker (available from results-report API)
+            const referenceRange = biomarker.referenceRange || '';
+            
             // Check if biomarker has historical values
             if (biomarker.historicalValues && Array.isArray(biomarker.historicalValues) && biomarker.historicalValues.length > 0) {
                 // Create a row for each historical value
@@ -258,6 +261,7 @@ function convertToCSV(data) {
                         status: historicalValue.status || biomarker.status,
                         value: historicalValue.value || biomarker.value || '',
                         unit: historicalValue.unit || biomarker.unit || '',
+                        referenceRange: referenceRange,
                         date: historicalValue.date || ''
                     });
                 });
@@ -269,6 +273,7 @@ function convertToCSV(data) {
                     status: biomarker.status,
                     value: biomarker.value || '',
                     unit: biomarker.unit || '',
+                    referenceRange: referenceRange,
                     date: biomarker.date || ''
                 });
             }
@@ -299,6 +304,7 @@ function convertToCSV(data) {
             biomarker.status,
             biomarker.value,
             biomarker.unit,
+            biomarker.referenceRange,
             biomarker.date
         ]);
     });

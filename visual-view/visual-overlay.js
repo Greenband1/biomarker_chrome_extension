@@ -644,13 +644,13 @@ const VisualOverlay = {
         statusControl.appendChild(statusLabel);
         statusControl.appendChild(statusButton);
 
-        // Print report button
+        // Print visual view button (uses native browser print)
         const printButton = document.createElement('button');
         printButton.type = 'button';
         printButton.className = 'fh-print-button';
-        printButton.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg> Print Report';
+        printButton.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg> Print / PDF';
         printButton.addEventListener('click', () => {
-            this.generatePrintReport(dataset);
+            window.print();
         });
 
         this.headerControls.appendChild(categoryControl);
@@ -1025,283 +1025,6 @@ const VisualOverlay = {
         }
     },
 
-    generatePrintReport(dataset) {
-        const metrics = computeDatasetMetrics(dataset, this.selectedCategories, this.selectedDates);
-        const reportDate = new Date().toLocaleDateString(undefined, { 
-            year: 'numeric', month: 'long', day: 'numeric' 
-        });
-
-        // Collect biomarker data by category
-        const categorizedData = [];
-        const outOfRangeBiomarkers = [];
-
-        Object.entries(dataset.categories)
-            .sort(([a], [b]) => a.localeCompare(b))
-            .forEach(([categoryName, category]) => {
-                if (!this.selectedCategories.has(categoryName)) return;
-                if (!Array.isArray(category?.biomarkers)) return;
-
-                const consolidatedBiomarkers = consolidateBiomarkersByName(category.biomarkers);
-                const biomarkersData = [];
-
-                consolidatedBiomarkers.forEach(biomarker => {
-                    const filteredHistorical = biomarker.historicalValues.filter(hv => 
-                        this.selectedDates.has(normalizeDate(hv.date))
-                    );
-                    if (filteredHistorical.length === 0) return;
-
-                    const events = buildTimelineEvents({ ...biomarker, historicalValues: filteredHistorical });
-                    const status = determineBiomarkerStatus(events);
-                    const latest = events[events.length - 1];
-
-                    const biomarkerInfo = {
-                        name: biomarker.name,
-                        value: formatValue(latest.value, latest.unit),
-                        status: status,
-                        reference: biomarker.referenceRange || 'N/A',
-                        date: formatDisplayDate(latest.date)
-                    };
-
-                    biomarkersData.push(biomarkerInfo);
-
-                    if (status === 'Out of Range') {
-                        outOfRangeBiomarkers.push({
-                            ...biomarkerInfo,
-                            category: categoryName
-                        });
-                    }
-                });
-
-                if (biomarkersData.length > 0) {
-                    categorizedData.push({
-                        name: categoryName,
-                        biomarkers: biomarkersData
-                    });
-                }
-            });
-
-        // Generate print HTML
-        const printHTML = `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Health Report - ${reportDate}</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            color: #1f2a44;
-            line-height: 1.5;
-            padding: 40px;
-        }
-        .header {
-            text-align: center;
-            margin-bottom: 32px;
-            padding-bottom: 20px;
-            border-bottom: 2px solid #667eea;
-        }
-        .header h1 {
-            font-size: 28px;
-            color: #2e3658;
-            margin-bottom: 8px;
-        }
-        .header .date {
-            font-size: 14px;
-            color: #6a7395;
-        }
-        .summary {
-            display: flex;
-            justify-content: center;
-            gap: 30px;
-            margin-bottom: 32px;
-            padding: 20px;
-            background: #f6f7fb;
-            border-radius: 12px;
-        }
-        .summary-item {
-            text-align: center;
-        }
-        .summary-value {
-            font-size: 28px;
-            font-weight: 700;
-        }
-        .summary-label {
-            font-size: 12px;
-            color: #6a7395;
-            text-transform: uppercase;
-        }
-        .summary-value.green { color: #1c8f63; }
-        .summary-value.red { color: #c94545; }
-        .summary-value.amber { color: #b87d0a; }
-        .summary-value.purple { color: #5a67ba; }
-        
-        .attention-section {
-            margin-bottom: 32px;
-            padding: 20px;
-            background: rgba(247, 112, 112, 0.08);
-            border-radius: 12px;
-            border: 1px solid rgba(247, 112, 112, 0.2);
-        }
-        .attention-section h2 {
-            font-size: 16px;
-            color: #c94545;
-            margin-bottom: 12px;
-        }
-        .attention-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(247, 112, 112, 0.15);
-        }
-        .attention-item:last-child { border-bottom: none; }
-        .attention-name { font-weight: 600; }
-        .attention-category { font-size: 12px; color: #6a7395; }
-        .attention-value { color: #c94545; font-weight: 600; }
-        
-        .category {
-            margin-bottom: 24px;
-            page-break-inside: avoid;
-        }
-        .category h2 {
-            font-size: 16px;
-            color: #2e3658;
-            padding: 8px 0;
-            border-bottom: 1px solid #e8eaf3;
-            margin-bottom: 12px;
-        }
-        .biomarker-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 13px;
-        }
-        .biomarker-table th {
-            text-align: left;
-            padding: 8px;
-            background: #f6f7fb;
-            color: #3d4a7a;
-            font-weight: 600;
-        }
-        .biomarker-table td {
-            padding: 8px;
-            border-bottom: 1px solid #e8eaf3;
-        }
-        .status-badge {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 600;
-        }
-        .status-in-range { background: rgba(48, 196, 141, 0.15); color: #1c8f63; }
-        .status-out-of-range { background: rgba(247, 112, 112, 0.15); color: #c94545; }
-        .status-improving { background: rgba(247, 178, 103, 0.15); color: #b87d0a; }
-        
-        .footer {
-            margin-top: 40px;
-            text-align: center;
-            font-size: 12px;
-            color: #6a7395;
-            padding-top: 20px;
-            border-top: 1px solid #e8eaf3;
-        }
-        
-        @media print {
-            body { padding: 20px; }
-            .category { page-break-inside: avoid; }
-        }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>Health Biomarker Report</h1>
-        <div class="date">Generated on ${reportDate}</div>
-    </div>
-    
-    <div class="summary">
-        <div class="summary-item">
-            <div class="summary-value">${metrics.totalBiomarkers}</div>
-            <div class="summary-label">Total Tested</div>
-        </div>
-        <div class="summary-item">
-            <div class="summary-value green">${metrics.inRange}</div>
-            <div class="summary-label">In Range</div>
-        </div>
-        <div class="summary-item">
-            <div class="summary-value red">${metrics.outOfRange}</div>
-            <div class="summary-label">Out of Range</div>
-        </div>
-        <div class="summary-item">
-            <div class="summary-value amber">${metrics.improving}</div>
-            <div class="summary-label">Improving</div>
-        </div>
-        <div class="summary-item">
-            <div class="summary-value purple">${metrics.healthScore}%</div>
-            <div class="summary-label">Health Score</div>
-        </div>
-    </div>
-
-    ${outOfRangeBiomarkers.length > 0 ? `
-    <div class="attention-section">
-        <h2>⚠️ Biomarkers Requiring Attention</h2>
-        ${outOfRangeBiomarkers.map(b => `
-            <div class="attention-item">
-                <div>
-                    <span class="attention-name">${b.name}</span>
-                    <span class="attention-category"> - ${b.category}</span>
-                </div>
-                <div class="attention-value">${b.value}</div>
-            </div>
-        `).join('')}
-    </div>
-    ` : ''}
-
-    ${categorizedData.map(cat => `
-    <div class="category">
-        <h2>${cat.name}</h2>
-        <table class="biomarker-table">
-            <thead>
-                <tr>
-                    <th>Biomarker</th>
-                    <th>Value</th>
-                    <th>Reference Range</th>
-                    <th>Status</th>
-                    <th>Date</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${cat.biomarkers.map(b => `
-                <tr>
-                    <td>${b.name}</td>
-                    <td>${b.value}</td>
-                    <td>${b.reference}</td>
-                    <td><span class="status-badge status-${normalizeStatus(b.status)}">${b.status}</span></td>
-                    <td>${b.date}</td>
-                </tr>
-                `).join('')}
-            </tbody>
-        </table>
-    </div>
-    `).join('')}
-
-    <div class="footer">
-        <p>This report is for informational purposes only. Please consult with your healthcare provider for medical advice.</p>
-    </div>
-</body>
-</html>
-        `;
-
-        // Open print window
-        const printWindow = window.open('', '_blank');
-        if (printWindow) {
-            printWindow.document.write(printHTML);
-            printWindow.document.close();
-            setTimeout(() => {
-                printWindow.print();
-            }, 250);
-        }
-    },
-
     renderCards(dataset) {
         if (!this.content) return;
         const existingList = this.content.querySelector('.fh-bio-grid');
@@ -1622,21 +1345,34 @@ function classifyBiomarker(biomarker) {
     }
     
     // Check for categorical binary (pass/fail type tests)
+    // Include shorthand variants like "NEG", "POS" and threshold indicators like "<1.0 NEG"
     const binaryKeywords = ['NEGATIVE', 'POSITIVE', 'NON-REACTIVE', 'REACTIVE', 
                            'NOT DETECTED', 'DETECTED', 'NONE SEEN'];
+    const binaryShorthand = [' NEG', ' POS', '\tNEG', '\tPOS'];  // With space/tab prefix to avoid false matches
     const latestUpper = latestValue.toUpperCase();
-    const isBinaryValue = binaryKeywords.some(kw => latestUpper.includes(kw));
+    
+    // Check if this is a qualitative result using new fields from API extractor
+    const isQualitativeFromAPI = biomarker.isQualitative === true || 
+                                 biomarker.resultType === 'qualitative';
+    
+    // Check for binary keywords or shorthand (NEG/POS at end of value like "<1.0 NEG")
+    const hasBinaryKeyword = binaryKeywords.some(kw => latestUpper.includes(kw));
+    const hasBinaryShorthand = binaryShorthand.some(sh => latestUpper.includes(sh)) ||
+                               latestUpper.endsWith('NEG') || 
+                               latestUpper.endsWith('POS');
+    const isBinaryValue = hasBinaryKeyword || hasBinaryShorthand || isQualitativeFromAPI;
     
     if (isBinaryValue || refData?.type === 'categorical') {
         // Determine if it's binary (pass/fail) or descriptive
-        const isBinary = binaryKeywords.some(kw => latestUpper.includes(kw)) ||
+        const isBinary = hasBinaryKeyword || hasBinaryShorthand || isQualitativeFromAPI ||
                         KNOWN_BIOMARKERS.binary.some(b => name.includes(b));
         
         return {
             ...classification,
             type: isBinary ? 'categorical-binary' : 'categorical-descriptive',
             displayHint: isBinary ? 'pass-fail' : 'simple',
-            valueType: 'categorical'
+            valueType: 'categorical',
+            isQualitative: true
         };
     }
     
@@ -1788,11 +1524,14 @@ function createBiomarkerCard(biomarker) {
     infoButton.innerHTML = 'ℹ';
     infoButton.setAttribute('aria-label', 'Learn more about this biomarker');
     
+    // Use API-provided description if available, fallback to hardcoded info
+    const apiDescription = biomarker.description;
     const info = getBiomarkerInfo(biomarker.name);
+    
     const tooltip = document.createElement('div');
     tooltip.className = 'fh-info-tooltip';
     tooltip.innerHTML = `
-        <div class="fh-tooltip-row"><strong>What:</strong> ${info.what}</div>
+        <div class="fh-tooltip-row"><strong>What:</strong> ${apiDescription || info.what}</div>
         <div class="fh-tooltip-row"><strong>Why it matters:</strong> ${info.why}</div>
         <div class="fh-tooltip-row"><strong>Affected by:</strong> ${info.affects}</div>
     `;
@@ -2374,51 +2113,138 @@ function createThresholdVisualization(events, refData, thresholdType) {
 
 /**
  * Creates a pass/fail display for binary categorical results
+ * Handles values like "NEGATIVE", "<1.0 NEG", "NON-REACTIVE", etc.
  */
 function createBinaryPassFailDisplay(events, refData) {
     const container = document.createElement('div');
     container.className = 'fh-binary-display';
     
-    // Display all events as pass/fail indicators
-    const timeline = document.createElement('div');
-    timeline.className = 'fh-binary-timeline';
+    // Get latest event for prominent display
+    const latestEvent = events[events.length - 1];
+    const latestValueUpper = String(latestEvent?.value || '').toUpperCase();
+    const latestIsPass = isPassingResult(latestValueUpper, latestEvent?.status);
     
-    events.slice().reverse().forEach((event) => {
-        const item = document.createElement('div');
-        item.className = 'fh-binary-item';
-        
-        const valueUpper = String(event.value || '').toUpperCase();
-        const isPass = valueUpper.includes('NEGATIVE') || 
-                      valueUpper.includes('NON-REACTIVE') || 
-                      valueUpper.includes('NOT DETECTED') ||
-                      valueUpper.includes('NONE SEEN') ||
-                      event.status === 'In Range';
-        
-        const icon = document.createElement('div');
-        icon.className = `fh-binary-icon ${isPass ? 'fh-binary-icon--pass' : 'fh-binary-icon--fail'}`;
-        icon.textContent = isPass ? '✓' : '✗';
-        
-        const details = document.createElement('div');
-        details.className = 'fh-binary-details';
-        
-        const value = document.createElement('span');
-        value.className = 'fh-binary-value';
-        value.textContent = event.value;
-        
-        const date = document.createElement('span');
-        date.className = 'fh-binary-date';
-        date.textContent = formatShortDate(event.date);
-        
-        details.appendChild(value);
-        details.appendChild(date);
-        
-        item.appendChild(icon);
-        item.appendChild(details);
-        timeline.appendChild(item);
-    });
+    // Create prominent result indicator for latest result
+    const prominentResult = document.createElement('div');
+    prominentResult.className = `fh-binary-prominent ${latestIsPass ? 'fh-binary-prominent--pass' : 'fh-binary-prominent--fail'}`;
     
-    container.appendChild(timeline);
+    const prominentIcon = document.createElement('div');
+    prominentIcon.className = 'fh-binary-prominent-icon';
+    prominentIcon.textContent = latestIsPass ? '✓' : '✗';
+    
+    const prominentLabel = document.createElement('div');
+    prominentLabel.className = 'fh-binary-prominent-label';
+    prominentLabel.textContent = getQualitativeLabel(latestValueUpper, latestIsPass);
+    
+    const prominentContext = document.createElement('div');
+    prominentContext.className = 'fh-binary-prominent-context';
+    prominentContext.textContent = getQualitativeContext(latestValueUpper, latestIsPass);
+    
+    prominentResult.appendChild(prominentIcon);
+    prominentResult.appendChild(prominentLabel);
+    prominentResult.appendChild(prominentContext);
+    container.appendChild(prominentResult);
+    
+    // Display historical events if more than one
+    if (events.length > 1) {
+        const timeline = document.createElement('div');
+        timeline.className = 'fh-binary-timeline';
+        
+        events.slice().reverse().forEach((event) => {
+            const item = document.createElement('div');
+            item.className = 'fh-binary-item';
+            
+            const valueUpper = String(event.value || '').toUpperCase();
+            const isPass = isPassingResult(valueUpper, event.status);
+            
+            const icon = document.createElement('div');
+            icon.className = `fh-binary-icon ${isPass ? 'fh-binary-icon--pass' : 'fh-binary-icon--fail'}`;
+            icon.textContent = isPass ? '✓' : '✗';
+            
+            const details = document.createElement('div');
+            details.className = 'fh-binary-details';
+            
+            const value = document.createElement('span');
+            value.className = 'fh-binary-value';
+            value.textContent = event.value;
+            
+            const date = document.createElement('span');
+            date.className = 'fh-binary-date';
+            date.textContent = formatShortDate(event.date);
+            
+            details.appendChild(value);
+            details.appendChild(date);
+            
+            item.appendChild(icon);
+            item.appendChild(details);
+            timeline.appendChild(item);
+        });
+        
+        container.appendChild(timeline);
+    }
+    
     return container;
+}
+
+/**
+ * Determines if a result value represents a passing/negative result
+ */
+function isPassingResult(valueUpper, status) {
+    // Check for explicit negative/passing keywords
+    if (valueUpper.includes('NEGATIVE') || valueUpper.endsWith('NEG') ||
+        valueUpper.includes('NON-REACTIVE') || valueUpper.includes('NOT DETECTED') ||
+        valueUpper.includes('NONE SEEN')) {
+        return true;
+    }
+    // Check for explicit positive/failing keywords
+    if ((valueUpper.includes('POSITIVE') || valueUpper.endsWith('POS') ||
+         valueUpper.includes('REACTIVE') || valueUpper.includes('DETECTED')) &&
+        !valueUpper.includes('NON-REACTIVE') && !valueUpper.includes('NOT DETECTED')) {
+        return false;
+    }
+    // Fall back to status
+    return status === 'In Range';
+}
+
+/**
+ * Gets a clear qualitative label for display
+ */
+function getQualitativeLabel(valueUpper, isPass) {
+    if (valueUpper.includes('NEGATIVE') || valueUpper.endsWith('NEG')) {
+        return 'NEGATIVE';
+    }
+    if (valueUpper.includes('POSITIVE') || valueUpper.endsWith('POS')) {
+        return 'POSITIVE';
+    }
+    if (valueUpper.includes('NON-REACTIVE')) {
+        return 'NON-REACTIVE';
+    }
+    if (valueUpper.includes('REACTIVE')) {
+        return 'REACTIVE';
+    }
+    if (valueUpper.includes('NOT DETECTED')) {
+        return 'NOT DETECTED';
+    }
+    if (valueUpper.includes('DETECTED')) {
+        return 'DETECTED';
+    }
+    return isPass ? 'NORMAL' : 'ABNORMAL';
+}
+
+/**
+ * Gets contextual explanation for qualitative result
+ */
+function getQualitativeContext(valueUpper, isPass) {
+    if (valueUpper.startsWith('<')) {
+        return isPass ? 'Below detection threshold' : 'Below expected range';
+    }
+    if (valueUpper.startsWith('>')) {
+        return isPass ? 'Above detection threshold' : 'Above expected range';
+    }
+    if (isPass) {
+        return 'Result within normal parameters';
+    }
+    return 'Result outside normal parameters';
 }
 
 /**
@@ -2553,8 +2379,19 @@ function createMiniSparkline(events, refData) {
     svg.classList.add('fh-mini-sparkline');
     
     const values = numericEvents.map(e => e.numericValue);
-    const min = Math.min(...values);
-    const max = Math.max(...values);
+    let min = Math.min(...values);
+    let max = Math.max(...values);
+    
+    // Include reference range in Y-axis scale so green band aligns with data positions
+    // This ensures out-of-range values visually appear outside the green zone
+    if (refData?.type === 'band') {
+        min = Math.min(min, refData.lower);
+        max = Math.max(max, refData.upper);
+    } else if (refData?.type === 'threshold' && refData.value !== undefined) {
+        min = Math.min(min, refData.value * 0.8);
+        max = Math.max(max, refData.value * 1.2);
+    }
+    
     const range = max - min || 1;
     
     const points = numericEvents.map((event, index) => {
@@ -3813,6 +3650,128 @@ function injectStyles() {
             height: 18px;
         }
 
+        /* Print Styles - prints the visual display directly */
+        @media print {
+            /* Hide the host page content */
+            body > *:not(.fh-visual-overlay) {
+                display: none !important;
+            }
+            
+            /* Reset overlay - it's the backdrop */
+            .fh-visual-overlay {
+                position: static !important;
+                display: block !important;
+                width: 100% !important;
+                height: auto !important;
+                max-height: none !important;
+                background: white !important;
+                padding: 0 !important;
+                overflow: visible !important;
+            }
+            
+            /* KEY FIX: Reset the panel - this has max-height: 94vh that cuts off content */
+            .fh-visual-panel {
+                position: static !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                max-height: none !important;
+                height: auto !important;
+                overflow: visible !important;
+                box-shadow: none !important;
+                border-radius: 0 !important;
+                background: white !important;
+            }
+            
+            /* Hide interactive controls */
+            .fh-header-controls,
+            .fh-close-button,
+            .fh-info-button,
+            .fh-category-dropdown,
+            .fh-date-dropdown,
+            .fh-status-dropdown,
+            .fh-print-button {
+                display: none !important;
+            }
+            
+            /* Reset the scrollable body */
+            .fh-visual-body {
+                overflow: visible !important;
+                max-height: none !important;
+                height: auto !important;
+                padding: 16px !important;
+            }
+            
+            /* Reset content container */
+            .fh-visual-content {
+                overflow: visible !important;
+                height: auto !important;
+            }
+            
+            /* Single column layout for reliable multi-page printing */
+            .fh-bio-grid {
+                display: block !important;
+            }
+            
+            /* Card print optimization */
+            .fh-bio-card {
+                display: block !important;
+                break-inside: avoid;
+                page-break-inside: avoid;
+                box-shadow: none !important;
+                border: 1px solid #ccc !important;
+                margin-bottom: 16px !important;
+                padding: 12px !important;
+                background: white !important;
+            }
+            
+            /* Ensure visualizations don't break across pages */
+            .fh-timeline-viz,
+            .fh-range-chart,
+            .fh-binary-display {
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }
+            
+            /* Header styling for print */
+            .fh-visual-header {
+                background: #f5f5f5 !important;
+                padding: 16px !important;
+                margin-bottom: 16px !important;
+                print-color-adjust: exact;
+                -webkit-print-color-adjust: exact;
+            }
+            
+            /* Summary metrics row */
+            .fh-summary-metrics {
+                display: flex !important;
+                flex-wrap: wrap !important;
+                gap: 12px !important;
+                justify-content: flex-start !important;
+            }
+            
+            /* Ensure status colors print */
+            .fh-status-in-range,
+            .fh-status-badge.fh-status-in-range { 
+                background: rgba(48, 196, 141, 0.2) !important;
+                color: #1c8f63 !important;
+                print-color-adjust: exact;
+                -webkit-print-color-adjust: exact;
+            }
+            .fh-status-out-of-range,
+            .fh-status-badge.fh-status-out-of-range { 
+                background: rgba(247, 112, 112, 0.2) !important;
+                color: #c94545 !important;
+                print-color-adjust: exact;
+                -webkit-print-color-adjust: exact;
+            }
+            
+            /* Page setup */
+            @page {
+                margin: 0.5in;
+                size: letter portrait;
+            }
+        }
+
         .fh-visual-body {
             overflow: hidden auto;
             padding: 0 28px 28px;
@@ -4698,6 +4657,71 @@ function injectStyles() {
         .fh-binary-date {
             font-size: 11px;
             color: #6a7395;
+        }
+
+        /* Prominent Binary Result Display */
+        .fh-binary-prominent {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px 24px;
+            border-radius: 16px;
+            margin-bottom: 12px;
+            text-align: center;
+        }
+
+        .fh-binary-prominent--pass {
+            background: linear-gradient(135deg, rgba(48, 196, 141, 0.12) 0%, rgba(48, 196, 141, 0.06) 100%);
+            border: 2px solid rgba(48, 196, 141, 0.3);
+        }
+
+        .fh-binary-prominent--fail {
+            background: linear-gradient(135deg, rgba(247, 112, 112, 0.12) 0%, rgba(247, 112, 112, 0.06) 100%);
+            border: 2px solid rgba(247, 112, 112, 0.3);
+        }
+
+        .fh-binary-prominent-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .fh-binary-prominent--pass .fh-binary-prominent-icon {
+            background: rgba(48, 196, 141, 0.2);
+            color: #1a7a55;
+        }
+
+        .fh-binary-prominent--fail .fh-binary-prominent-icon {
+            background: rgba(247, 112, 112, 0.2);
+            color: #a33a3a;
+        }
+
+        .fh-binary-prominent-label {
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            margin-bottom: 6px;
+        }
+
+        .fh-binary-prominent--pass .fh-binary-prominent-label {
+            color: #1a7a55;
+        }
+
+        .fh-binary-prominent--fail .fh-binary-prominent-label {
+            color: #a33a3a;
+        }
+
+        .fh-binary-prominent-context {
+            font-size: 12px;
+            color: #6a7395;
+            font-weight: 500;
         }
 
         /* Pattern/Grade Display */
