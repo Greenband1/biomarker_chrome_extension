@@ -561,6 +561,7 @@ function getBiomarkerCategoryFromName(biomarkerName) {
         'neutrophil': 'Blood & Hematology', 'lymphocyte': 'Blood & Hematology', 'monocyte': 'Blood & Hematology',
         'eosinophil': 'Blood & Hematology', 'basophil': 'Blood & Hematology', 'mcv': 'Blood & Hematology',
         'mch': 'Blood & Hematology', 'mchc': 'Blood & Hematology', 'rdw': 'Blood & Hematology', 'mpv': 'Blood & Hematology',
+        'abo group': 'Blood & Hematology', 'blood type': 'Blood & Hematology', 'rhesus': 'Blood & Hematology', 'rh factor': 'Blood & Hematology',
         
         // Metabolic & Diabetes
         'glucose': 'Metabolic & Diabetes', 'insulin': 'Metabolic & Diabetes', 'hemoglobin a1c': 'Metabolic & Diabetes',
