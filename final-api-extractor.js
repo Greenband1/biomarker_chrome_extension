@@ -113,7 +113,12 @@ function mapApiCategoryToInternal(apiCategory) {
         
         // Autoimmunity
         'Autoimmunity': 'Autoimmunity',
-        'Autoimmune': 'Autoimmunity'
+        'Autoimmune': 'Autoimmunity',
+        
+        // Reproductive Health (sex-specific)
+        'Male Health': 'Reproductive Health',
+        'Female Health': 'Reproductive Health',
+        'Reproductive': 'Reproductive Health'
     };
     
     // Check for exact match first
@@ -607,7 +612,12 @@ function getBiomarkerCategoryFromName(biomarkerName) {
         'anti-dsdna': 'Autoimmunity', 'anti-smith': 'Autoimmunity', 'scleroderma': 'Autoimmunity',
         'lupus': 'Autoimmunity', 'rheumatoid factor': 'Autoimmunity', 'sjogren': 'Autoimmunity',
         'jo-1': 'Autoimmunity', 'scl-70': 'Autoimmunity', 'ssa': 'Autoimmunity', 'ssb': 'Autoimmunity',
-        'rnp': 'Autoimmunity', 'chromatin': 'Autoimmunity', 'ribosomal': 'Autoimmunity'
+        'rnp': 'Autoimmunity', 'chromatin': 'Autoimmunity', 'ribosomal': 'Autoimmunity',
+        'cardiolipin': 'Autoimmunity', 'phospholipid': 'Autoimmunity', 'beta-2 glycoprotein': 'Autoimmunity',
+        
+        // Reproductive Health (sex-specific)
+        'prostate': 'Reproductive Health', 'psa': 'Reproductive Health',
+        'ovarian': 'Reproductive Health', 'amh': 'Reproductive Health', 'anti-mullerian': 'Reproductive Health'
     };
     
     for (const [keyword, category] of Object.entries(categoryMap)) {
