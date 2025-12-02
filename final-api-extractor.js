@@ -65,86 +65,64 @@ function getBestDisplayName(names) {
 }
 
 /**
- * Map API category names to internal category names
- * Function Health API uses different naming than our internal categories
+ * Map API category names to internal category names (with normalization)
+ * HYBRID APPROACH: Accept any API category, only normalize for UI consistency
+ * Unknown categories are accepted as-is (not forced to "General")
  */
 function mapApiCategoryToInternal(apiCategory) {
     if (!apiCategory) return null;
     
-    const categoryMapping = {
-        // Heart / Cardiovascular
+    // Only normalize categories that need expanded/consistent naming
+    // All other API categories are accepted as-is
+    const categoryNormalization = {
+        // Expand abbreviated names for UI consistency
         'Heart': 'Heart & Cardiovascular',
         'Cardiovascular': 'Heart & Cardiovascular',
         'Heart Health': 'Heart & Cardiovascular',
-        
-        // Blood
         'Blood': 'Blood & Hematology',
         'Hematology': 'Blood & Hematology',
-        
-        // Metabolic
         'Metabolic': 'Metabolic & Diabetes',
         'Diabetes': 'Metabolic & Diabetes',
         'Metabolism': 'Metabolic & Diabetes',
-        
-        // Kidney
         'Kidney': 'Kidney & Renal',
         'Renal': 'Kidney & Renal',
         
-        // Direct matches (API name = internal name)
-        'Liver': 'Liver',
-        'Thyroid': 'Thyroid',
-        'Hormones': 'Hormones',
-        'Nutrients': 'Nutrients',
-        'Electrolytes': 'Electrolytes',
-        'Urinalysis': 'Urinalysis',
-        'Inflammation': 'Inflammation',
-        
-        // Infectious Disease
+        // Normalize variations
         'Infectious': 'Infectious Disease',
-        'Infectious Disease': 'Infectious Disease',
         'STD': 'Infectious Disease',
         'STI': 'Infectious Disease',
-        
-        // Environmental Toxins
-        'Environmental Toxins': 'Environmental Toxins',
+        'Other': 'Infectious Disease',  // "Other" in PDF contains STDs
         'Environmental': 'Environmental Toxins',
         'Toxins': 'Environmental Toxins',
         'Heavy Metals': 'Environmental Toxins',
-        
-        // Autoimmunity
-        'Autoimmunity': 'Autoimmunity',
         'Autoimmune': 'Autoimmunity',
+        'Pancreatic': 'Pancreas',
+        'Stress': 'Stress & Aging',
+        'Aging': 'Stress & Aging',
+        'Urine': 'Urinalysis',
         
-        // Reproductive Health (sex-specific)
+        // Sex-specific to unified category
         'Male Health': 'Reproductive Health',
         'Female Health': 'Reproductive Health',
-        'Reproductive': 'Reproductive Health',
-        
-        // Pancreas
-        'Pancreas': 'Pancreas',
-        'Pancreatic': 'Pancreas',
-        
-        // Stress & Aging
-        'Stress & Aging': 'Stress & Aging',
-        'Stress': 'Stress & Aging',
-        'Aging': 'Stress & Aging'
+        'Reproductive': 'Reproductive Health'
     };
     
-    // Check for exact match first
-    if (categoryMapping[apiCategory]) {
-        return categoryMapping[apiCategory];
+    // Check for exact normalization match
+    if (categoryNormalization[apiCategory]) {
+        return categoryNormalization[apiCategory];
     }
     
     // Check for partial match (API might return variations)
     const lowerApi = apiCategory.toLowerCase();
-    for (const [key, value] of Object.entries(categoryMapping)) {
+    for (const [key, value] of Object.entries(categoryNormalization)) {
         if (lowerApi.includes(key.toLowerCase())) {
             return value;
         }
     }
     
-    // Return original if no mapping found
-    console.log(`⚠️ Unknown API category: "${apiCategory}" - using as-is`);
+    // HYBRID: Accept unknown API categories as-is (don't force to "General")
+    // This allows new Function Health categories to work automatically
+    console.log(`📂 New API category detected: "${apiCategory}" - using as-is`);
     return apiCategory;
 }
 

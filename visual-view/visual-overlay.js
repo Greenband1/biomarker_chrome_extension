@@ -171,8 +171,14 @@ const CATEGORY_ICONS = {
     'Reproductive Health': '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>',
     'Pancreas': '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-4h2v2h-2zm1-10c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z"/></svg>',
     'Stress & Aging': '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>',
+    // New categories from Function Health
+    'Biological Age': '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>',
+    'Cancer Detection': '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>',
+    'Immune Regulation': '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm7 10c0 4.52-2.98 8.69-7 9.93-4.02-1.24-7-5.41-7-9.93V6.3l7-3.11 7 3.11V11zm-11.59.59L6 13l4 4 8-8-1.41-1.42L10 14.17z"/></svg>',
+    // Default icon for any new/unknown category
     'General': '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm2 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>'
 };
+
 
 /**
  * Generate a human-readable progress narrative for a biomarker
@@ -392,51 +398,58 @@ function createMetricsDashboard(metrics) {
 
 /**
  * Get category icon HTML, with fallback for unknown categories
+ * HYBRID APPROACH: Accepts any category, uses General icon as fallback
  */
 function getCategoryIcon(categoryName) {
-    // Check for exact match first
+    // Check for exact match first (most common case)
     if (CATEGORY_ICONS[categoryName]) {
         return CATEGORY_ICONS[categoryName];
     }
-    // Check for partial matches
+    
+    // Check for partial matches to handle variations
     const lowerName = categoryName.toLowerCase();
-    if (lowerName.includes('heart') || lowerName.includes('cardio')) {
-        return CATEGORY_ICONS['Heart & Cardiovascular'];
+    const partialMatches = {
+        'heart': 'Heart & Cardiovascular',
+        'cardio': 'Heart & Cardiovascular',
+        'liver': 'Liver',
+        'kidney': 'Kidney & Renal',
+        'renal': 'Kidney & Renal',
+        'blood': 'Blood & Hematology',
+        'hematology': 'Blood & Hematology',
+        'thyroid': 'Thyroid',
+        'hormone': 'Hormones',
+        'metabolic': 'Metabolic & Diabetes',
+        'diabetes': 'Metabolic & Diabetes',
+        'infectious': 'Infectious Disease',
+        'nutrient': 'Nutrients',
+        'vitamin': 'Nutrients',
+        'inflam': 'Inflammation',
+        'electrolyte': 'Electrolytes',
+        'urin': 'Urinalysis',
+        'toxin': 'Environmental Toxins',
+        'environmental': 'Environmental Toxins',
+        'autoimmun': 'Autoimmunity',
+        'reproductive': 'Reproductive Health',
+        'male health': 'Reproductive Health',
+        'female health': 'Reproductive Health',
+        'pancrea': 'Pancreas',
+        'stress': 'Stress & Aging',
+        'aging': 'Stress & Aging',
+        'biological age': 'Biological Age',
+        'bioage': 'Biological Age',
+        'cancer': 'Cancer Detection',
+        'immune': 'Immune Regulation'
+    };
+    
+    for (const [key, category] of Object.entries(partialMatches)) {
+        if (lowerName.includes(key)) {
+            return CATEGORY_ICONS[category];
+        }
     }
-    if (lowerName.includes('liver')) {
-        return CATEGORY_ICONS['Liver'];
-    }
-    if (lowerName.includes('kidney') || lowerName.includes('renal')) {
-        return CATEGORY_ICONS['Kidney & Renal'];
-    }
-    if (lowerName.includes('blood') || lowerName.includes('hematology')) {
-        return CATEGORY_ICONS['Blood & Hematology'];
-    }
-    if (lowerName.includes('thyroid')) {
-        return CATEGORY_ICONS['Thyroid'];
-    }
-    if (lowerName.includes('hormone')) {
-        return CATEGORY_ICONS['Hormones'];
-    }
-    if (lowerName.includes('metabolic') || lowerName.includes('diabetes')) {
-        return CATEGORY_ICONS['Metabolic & Diabetes'];
-    }
-    if (lowerName.includes('infectious') || lowerName.includes('disease')) {
-        return CATEGORY_ICONS['Infectious Disease'];
-    }
-    if (lowerName.includes('nutrient') || lowerName.includes('vitamin')) {
-        return CATEGORY_ICONS['Nutrients'];
-    }
-    if (lowerName.includes('inflam')) {
-        return CATEGORY_ICONS['Inflammation'];
-    }
-    if (lowerName.includes('electrolyte')) {
-        return CATEGORY_ICONS['Electrolytes'];
-    }
-    if (lowerName.includes('urin')) {
-        return CATEGORY_ICONS['Urinalysis'];
-    }
-    // Default icon
+    
+    // HYBRID: Return General icon for any unknown category
+    // This allows new Function Health categories to display properly
+    console.log(`📂 Using default icon for category: "${categoryName}"`);
     return CATEGORY_ICONS['General'];
 }
 
