@@ -122,7 +122,12 @@ function mapApiCategoryToInternal(apiCategory) {
         
         // Pancreas
         'Pancreas': 'Pancreas',
-        'Pancreatic': 'Pancreas'
+        'Pancreatic': 'Pancreas',
+        
+        // Stress & Aging
+        'Stress & Aging': 'Stress & Aging',
+        'Stress': 'Stress & Aging',
+        'Aging': 'Stress & Aging'
     };
     
     // Check for exact match first
@@ -627,7 +632,10 @@ function getBiomarkerCategoryFromName(biomarkerName) {
         'ovarian': 'Reproductive Health', 'amh': 'Reproductive Health', 'anti-mullerian': 'Reproductive Health',
         
         // Pancreas
-        'amylase': 'Pancreas', 'lipase': 'Pancreas', 'pancreas': 'Pancreas', 'pancreatic': 'Pancreas'
+        'amylase': 'Pancreas', 'lipase': 'Pancreas', 'pancreas': 'Pancreas', 'pancreatic': 'Pancreas',
+        
+        // Stress & Aging
+        'z score': 'Stress & Aging', 'dhea sulfate': 'Stress & Aging', 'dhea-s': 'Stress & Aging'
     };
     
     for (const [keyword, category] of Object.entries(categoryMap)) {
