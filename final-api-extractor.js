@@ -118,7 +118,11 @@ function mapApiCategoryToInternal(apiCategory) {
         // Reproductive Health (sex-specific)
         'Male Health': 'Reproductive Health',
         'Female Health': 'Reproductive Health',
-        'Reproductive': 'Reproductive Health'
+        'Reproductive': 'Reproductive Health',
+        
+        // Pancreas
+        'Pancreas': 'Pancreas',
+        'Pancreatic': 'Pancreas'
     };
     
     // Check for exact match first
@@ -620,7 +624,10 @@ function getBiomarkerCategoryFromName(biomarkerName) {
         
         // Reproductive Health (sex-specific)
         'prostate': 'Reproductive Health', 'psa': 'Reproductive Health',
-        'ovarian': 'Reproductive Health', 'amh': 'Reproductive Health', 'anti-mullerian': 'Reproductive Health'
+        'ovarian': 'Reproductive Health', 'amh': 'Reproductive Health', 'anti-mullerian': 'Reproductive Health',
+        
+        // Pancreas
+        'amylase': 'Pancreas', 'lipase': 'Pancreas', 'pancreas': 'Pancreas', 'pancreatic': 'Pancreas'
     };
     
     for (const [keyword, category] of Object.entries(categoryMap)) {
