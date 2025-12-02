@@ -250,6 +250,41 @@ function parseAPIResponse(rawData) {
     // Extract all biomarker results from the nested structure
     let allBiomarkerResults = [];
     
+    // STEP 1: Build a GLOBAL lookup map of biomarker ID -> category/name
+    // This scans ALL requisitions and visits FIRST before processing results
+    // This ensures we can find categories even if a visit only has biomarkerResults
+    const globalBiomarkerCategoryMap = new Map();
+    const globalBiomarkerNameMap = new Map();
+    
+    if (Array.isArray(rawData)) {
+        rawData.forEach(requisition => {
+            if (requisition.visits && Array.isArray(requisition.visits)) {
+                requisition.visits.forEach(visit => {
+                    if (visit.biomarkers && Array.isArray(visit.biomarkers)) {
+                        visit.biomarkers.forEach(entry => {
+                            const biomarkerId = entry.biomarker?.id;
+                            const category = entry.biomarker?.categories?.[0]?.categoryName || null;
+                            const name = entry.biomarker?.name || '';
+                            
+                            if (biomarkerId) {
+                                // Only set if not already set (keep first found)
+                                if (category && !globalBiomarkerCategoryMap.has(biomarkerId)) {
+                                    globalBiomarkerCategoryMap.set(biomarkerId, category);
+                                }
+                                if (name && !globalBiomarkerNameMap.has(biomarkerId)) {
+                                    globalBiomarkerNameMap.set(biomarkerId, name);
+                                }
+                            }
+                        });
+                    }
+                });
+            }
+        });
+    }
+    
+    console.log(`📂 Built global biomarker lookup: ${globalBiomarkerCategoryMap.size} categories, ${globalBiomarkerNameMap.size} names`);
+    
+    // STEP 2: Now process all results using the global lookup map
     if (Array.isArray(rawData)) {
         // Each item in the array is a requisition with visits
         rawData.forEach((requisition, reqIndex) => {
@@ -264,24 +299,6 @@ function parseAPIResponse(rawData) {
                         visitDate: visit.visitDate,
                         biomarkerResultsCount: visit.biomarkerResults ? visit.biomarkerResults.length : 0
                     });
-                    
-                    // Build a lookup map of biomarker ID -> category from visit.biomarkers
-                    // This allows us to find categories for results in the legacy path
-                    const biomarkerCategoryMap = new Map();
-                    const biomarkerNameMap = new Map();
-                    
-                    if (visit.biomarkers && Array.isArray(visit.biomarkers)) {
-                        visit.biomarkers.forEach(entry => {
-                            const biomarkerId = entry.biomarker?.id;
-                            const category = entry.biomarker?.categories?.[0]?.categoryName || null;
-                            const name = entry.biomarker?.name || '';
-                            
-                            if (biomarkerId) {
-                                if (category) biomarkerCategoryMap.set(biomarkerId, category);
-                                if (name) biomarkerNameMap.set(biomarkerId, name);
-                            }
-                        });
-                    }
                     
                     // Check if visit has biomarker entries with parent biomarker info (new API structure)
                     if (visit.biomarkers && Array.isArray(visit.biomarkers)) {
@@ -318,10 +335,10 @@ function parseAPIResponse(rawData) {
                             );
                             
                             if (!alreadyAdded) {
-                                // Try to find category from the biomarker lookup map
+                                // Use GLOBAL lookup map to find category
                                 const biomarkerId = result.biomarkerId;
-                                const apiCategory = biomarkerId ? biomarkerCategoryMap.get(biomarkerId) : null;
-                                const parentName = biomarkerId ? biomarkerNameMap.get(biomarkerId) : null;
+                                const apiCategory = biomarkerId ? globalBiomarkerCategoryMap.get(biomarkerId) : null;
+                                const parentName = biomarkerId ? globalBiomarkerNameMap.get(biomarkerId) : null;
                                 
                                 allBiomarkerResults.push({
                                     ...result,
@@ -731,17 +748,15 @@ function parseAPIResponseCurrentOnly(rawData) {
     // Extract all biomarker results from the nested structure
     let allBiomarkerResults = [];
     
+    // STEP 1: Build a GLOBAL lookup map of biomarker ID -> category/name
+    // This scans ALL requisitions and visits FIRST before processing results
+    const globalBiomarkerCategoryMap = new Map();
+    const globalBiomarkerNameMap = new Map();
+    
     if (Array.isArray(rawData)) {
-        rawData.forEach((requisition, reqIndex) => {
-            console.log(`📋 Processing requisition ${reqIndex + 1} for current results`);
-            
+        rawData.forEach(requisition => {
             if (requisition.visits && Array.isArray(requisition.visits)) {
-                requisition.visits.forEach((visit, visitIndex) => {
-                    // Build a lookup map of biomarker ID -> category from visit.biomarkers
-                    // This allows us to find categories for results in the legacy path
-                    const biomarkerCategoryMap = new Map();
-                    const biomarkerNameMap = new Map();
-                    
+                requisition.visits.forEach(visit => {
                     if (visit.biomarkers && Array.isArray(visit.biomarkers)) {
                         visit.biomarkers.forEach(entry => {
                             const biomarkerId = entry.biomarker?.id;
@@ -749,12 +764,29 @@ function parseAPIResponseCurrentOnly(rawData) {
                             const name = entry.biomarker?.name || '';
                             
                             if (biomarkerId) {
-                                if (category) biomarkerCategoryMap.set(biomarkerId, category);
-                                if (name) biomarkerNameMap.set(biomarkerId, name);
+                                if (category && !globalBiomarkerCategoryMap.has(biomarkerId)) {
+                                    globalBiomarkerCategoryMap.set(biomarkerId, category);
+                                }
+                                if (name && !globalBiomarkerNameMap.has(biomarkerId)) {
+                                    globalBiomarkerNameMap.set(biomarkerId, name);
+                                }
                             }
                         });
                     }
-                    
+                });
+            }
+        });
+    }
+    
+    console.log(`📂 Built global biomarker lookup: ${globalBiomarkerCategoryMap.size} categories`);
+    
+    // STEP 2: Now process all results using the global lookup map
+    if (Array.isArray(rawData)) {
+        rawData.forEach((requisition, reqIndex) => {
+            console.log(`📋 Processing requisition ${reqIndex + 1} for current results`);
+            
+            if (requisition.visits && Array.isArray(requisition.visits)) {
+                requisition.visits.forEach((visit, visitIndex) => {
                     // Check for biomarker entries with parent biomarker info (new API structure)
                     if (visit.biomarkers && Array.isArray(visit.biomarkers)) {
                         visit.biomarkers.forEach(entry => {
@@ -786,10 +818,10 @@ function parseAPIResponseCurrentOnly(rawData) {
                             );
                             
                             if (!alreadyAdded) {
-                                // Try to find category from the biomarker lookup map
+                                // Use GLOBAL lookup map to find category
                                 const biomarkerId = result.biomarkerId;
-                                const apiCategory = biomarkerId ? biomarkerCategoryMap.get(biomarkerId) : null;
-                                const parentName = biomarkerId ? biomarkerNameMap.get(biomarkerId) : null;
+                                const apiCategory = biomarkerId ? globalBiomarkerCategoryMap.get(biomarkerId) : null;
+                                const parentName = biomarkerId ? globalBiomarkerNameMap.get(biomarkerId) : null;
                                 
                                 allBiomarkerResults.push({
                                     ...result,
