@@ -2,23 +2,31 @@
 
 A Chrome extension that extracts biomarker data from health services into exportable formats (CSV, JSON, table).
 
-![Extension Version](https://img.shields.io/badge/version-2.6.0-blue.svg)
+![Extension Version](https://img.shields.io/badge/version-2.7.0-blue.svg)
 ![Chrome Extension](https://img.shields.io/badge/platform-Chrome%20Extension-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-## 🚀 What's New (v2.6.0)
+## 🚀 What's New (v2.7.0)
 
-### API & Data Improvements
-- **New Results-Report API** - Switched to authoritative `/api/v1/results-report` endpoint for accurate categorization
-- **Dynamic API Discovery** - Automatically discovers API endpoints with fallback mechanisms
-- **Improved Categorization** - 96% of biomarkers now use API-provided categories (vs. keyword matching)
-- **Reference Range in CSV** - Export now includes reference range column for easier analysis
+### Code Quality & Maintainability
+- **Modular Architecture** - Extracted CSS and JS into separate modules for easier maintenance
+- **Shared Utilities** - Created canonical source for shared functions across modules
 
-### Visual View Enhancements
-- **Fixed Sparkline Positioning** - Out-of-range values now correctly appear outside the green zone
-- **Better Qualitative Results** - Improved display for results like "NEG", "NON-REACTIVE", etc.
-- **API-Powered Tooltips** - Info button now shows descriptions from Function Health API
-- **Native Print/PDF** - Print button uses browser's native print for direct PDF export
+### Visual View Fixes
+- **Below-Detection Values** - Fixed threshold visualization for values like "<2.0" to show clearly in the good zone
+- **Improved Marker Positioning** - Values reported as below detection limit now appear correctly
+
+### New Features
+- **GitHub Feedback Link** - Added subtle feedback icon in popup footer for easy issue reporting
+
+### Previous Features (v2.6.0)
+- New Results-Report API with dynamic endpoint discovery
+- Improved categorization (96% API-provided)
+- Reference range in CSV export
+- Fixed sparkline positioning
+- Better qualitative results display
+- API-powered tooltips
+- Native print/PDF support
 
 ### Previous Features (v2.5.x)
 - Complete UI redesign with health-focused color palette
