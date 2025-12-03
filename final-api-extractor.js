@@ -188,7 +188,9 @@ async function fetchWithFallback(endpoint, token) {
 setupApiDiscovery();
 
 // =============================================================================
-// UTILITY FUNCTIONS
+// SHARED UTILITIES (COPIED FROM shared/utils.js)
+// DO NOT EDIT HERE - Edit shared/utils.js and copy changes to this section
+// Last synced: 2025-12-03
 // =============================================================================
 
 /**
@@ -249,6 +251,10 @@ function getBestDisplayName(names) {
     
     return sorted[0];
 }
+
+// =============================================================================
+// END SHARED UTILITIES
+// =============================================================================
 
 // =============================================================================
 // CATEGORY MAPPING

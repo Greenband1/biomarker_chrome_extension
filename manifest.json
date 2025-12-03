@@ -35,7 +35,12 @@
     {
       "resources": [
         "final-api-extractor.js",
-        "visual-view/visual-overlay.js"
+        "visual-view/visual-overlay.js",
+        "visual-view/biomarker-info.js",
+        "visual-view/category-icons.js",
+        "visual-view/overlay-styles.js",
+        "visual-view/chart-renderers.js",
+        "shared/utils.js"
       ],
       "matches": ["https://*.functionhealth.com/*"]
     }

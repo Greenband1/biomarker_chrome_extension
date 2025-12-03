@@ -1,3 +1,19 @@
+/**
+ * Visual Overlay - Main Module
+ * 
+ * This file orchestrates the visual biomarker display overlay.
+ * Related functionality has been extracted to separate modules for reference:
+ * - biomarker-info.js: BIOMARKER_INFO constant and getBiomarkerInfo()
+ * - category-icons.js: CATEGORY_ICONS constant and getCategoryIcon()
+ * - overlay-styles.js: CSS injection via injectStyles()
+ * - chart-renderers.js: All visualization/chart rendering functions
+ * - ../shared/utils.js: Shared utility functions
+ * 
+ * Note: This file currently uses local definitions for all functions.
+ * The extracted modules are available for future refactoring when
+ * local definitions can be fully removed.
+ */
+
 const STATUS_COLORS = {
     'In Range': '#30c48d',
     'Out of Range': '#f77070',
@@ -2024,22 +2040,45 @@ function createThresholdVisualization(events, refData, thresholdType) {
     const isUpperBound = thresholdType === 'threshold-upper'; // Must be below threshold
     
     const latestEvent = events[events.length - 1];
-    const currentValue = extractNumericFromValue(latestEvent?.value);
+    const rawValue = String(latestEvent?.value || '').trim();
+    let currentValue = extractNumericFromValue(rawValue);
+    
+    // Check if value is a "below detection limit" type (e.g., "<2.0")
+    // These should be positioned clearly in the "good" zone for upper-bound thresholds
+    const isBelowDetection = rawValue.startsWith('<') && !rawValue.startsWith('<=');
+    const isAboveDetection = rawValue.startsWith('>') && !rawValue.startsWith('>=');
     
     if (currentValue === null) {
         return null;
     }
     
+    // For "below detection" values on upper-bound thresholds, position marker clearly in good zone
+    // The extracted number (e.g., 2.0 from "<2.0") represents the detection limit, not the actual value
+    let displayValue = currentValue;
+    if (isBelowDetection && isUpperBound) {
+        // Position at 40% of the threshold to show it's clearly below
+        displayValue = threshold * 0.4;
+    } else if (isAboveDetection && !isUpperBound) {
+        // For ">X" on lower-bound thresholds, position clearly above
+        displayValue = threshold * 1.6;
+    }
+    
     // Calculate display bounds
-    const maxVal = Math.max(threshold * 1.5, currentValue * 1.2);
+    const maxVal = Math.max(threshold * 1.5, displayValue * 1.2, currentValue * 1.2);
     const displayRange = maxVal;
     
     const thresholdPos = (threshold / displayRange) * 100;
-    const valuePos = Math.max(0, Math.min(100, (currentValue / displayRange) * 100));
+    const valuePos = Math.max(0, Math.min(100, (displayValue / displayRange) * 100));
     
     // Determine if value is good or bad
     let isGood;
-    if (isUpperBound) {
+    if (isBelowDetection && isUpperBound) {
+        // "<X" when target is "<threshold" is always good
+        isGood = true;
+    } else if (isAboveDetection && !isUpperBound) {
+        // ">X" when target is ">threshold" is always good
+        isGood = true;
+    } else if (isUpperBound) {
         isGood = refData.inclusive ? currentValue <= threshold : currentValue < threshold;
     } else {
         isGood = refData.inclusive ? currentValue >= threshold : currentValue > threshold;

@@ -1502,6 +1502,16 @@ document.addEventListener('DOMContentLoaded', () => {
         visualViewBtn.addEventListener('click', handleVisualViewClick);
     }
     
+    // GitHub feedback link
+    document.getElementById('feedbackLink')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        const version = chrome.runtime.getManifest().version;
+        const issueUrl = new URL('https://github.com/Greenband1/biomarker_chrome_extension/issues/new');
+        issueUrl.searchParams.set('title', '[Feedback] ');
+        issueUrl.searchParams.set('body', `**Extension Version:** ${version}\n\n**Describe your feedback:**\n\n`);
+        chrome.tabs.create({ url: issueUrl.toString() });
+    });
+    
     // Advanced filters toggle
     document.getElementById('advancedToggle').addEventListener('click', toggleAdvancedFilters);
     document.getElementById('closeAdvanced').addEventListener('click', () => {
