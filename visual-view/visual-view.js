@@ -70,16 +70,21 @@ function ensureOverlay() {
 
 function renderDataset(dataset, { filtersApplied, latestOnly }) {
     if (!contentContainer) return;
-    contentContainer.innerHTML = '';
+    contentContainer.replaceChildren();
 
     const summaryBar = document.createElement('div');
     summaryBar.className = 'visual-view-summary';
-    summaryBar.innerHTML = `
-        <span>${Object.keys(dataset.categories).length} categories</span>
-        <span>${dataset.summary?.total ?? 0} biomarkers</span>
-        <span>${filtersApplied ? 'Filters active' : 'All data'}</span>
-        <span>${latestOnly ? 'Showing latest results' : 'Full history'}</span>
-    `;
+    const summaryItems = [
+        `${Object.keys(dataset.categories).length} categories`,
+        `${dataset.summary?.total ?? 0} biomarkers`,
+        filtersApplied ? 'Filters active' : 'All data',
+        latestOnly ? 'Showing latest results' : 'Full history',
+    ];
+    summaryItems.forEach((text) => {
+        const span = document.createElement('span');
+        span.textContent = text;
+        summaryBar.appendChild(span);
+    });
     contentContainer.appendChild(summaryBar);
 
     Object.entries(dataset.categories).forEach(([categoryName, category]) => {
