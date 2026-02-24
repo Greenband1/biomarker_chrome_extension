@@ -540,6 +540,8 @@ function parseResultsReportResponse(rawData) {
                 date: normalizeDate(record.currentResult?.dateOfService) || '',
                 referenceRange: hasReferenceRange ? record.rangeString : null,
                 hasReferenceRange: hasReferenceRange,
+                optimalRangeMin: record.optimalRangeMin || '',
+                optimalRangeMax: record.optimalRangeMax || '',
                 rangeContext: record.outOfRangeType,  // 'in_range', 'above', 'below', 'OTHER', 'text', etc.
                 questId: record.questBiomarkerId,
                 category: categoryName,
@@ -672,6 +674,8 @@ function parseResultsReportCurrentOnly(rawData) {
                 date: normalizeDate(record.currentResult.dateOfService) || '',
                 referenceRange: hasReferenceRange ? record.rangeString : null,
                 hasReferenceRange: hasReferenceRange,
+                optimalRangeMin: record.optimalRangeMin || '',
+                optimalRangeMax: record.optimalRangeMax || '',
                 rangeContext: record.outOfRangeType,  // 'in_range', 'above', 'below', 'OTHER', 'text', etc.
                 questId: record.questBiomarkerId,
                 category: categoryName,

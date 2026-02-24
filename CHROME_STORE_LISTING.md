@@ -62,8 +62,11 @@ Export your biomarker data from Function Health into convenient formats for anal
 📋 EXPORT FORMATS
 
 CSV Format - Perfect for Excel, Google Sheets, or data analysis:
-Category,Biomarker,Status,Value,Unit,Date
-Heart & Cardiovascular,HDL Cholesterol,In Range,65,mg/dL,2025-07-25
+Category,Biomarker,Quest ID,Status,Value,Unit,Reference Range,Optimal Range Min,Optimal Range Max,Out of Range Direction,Date
+Heart & Cardiovascular,Apolipoprotein B (ApoB),50057700,Out of Range,97,mg/dL,<90,40,70,above,2026-01-19
+
+Quest ID enables LOINC mapping for lab interoperability.
+Optimal ranges are Function Health's tighter wellness targets (distinct from Quest reference ranges).
 
 JSON Format - Machine-readable for developers and advanced analysis
 Table Format - Tab-separated for easy pasting into documents
@@ -201,7 +204,7 @@ This extension is not affiliated with Function Health. Users are responsible for
 ## Store Submission Checklist
 
 ### **Before Submission**
-- [ ] Extension ZIP package created (✅ Done: personal_health_data_tool_v2.4.0.zip)
+- [ ] Extension ZIP package created (✅ Done: personal_health_data_tool_v2.8.0.zip)
 - [ ] Developer account registered and verified
 - [ ] $5 registration fee paid
 - [ ] Screenshots prepared (1-5 images)

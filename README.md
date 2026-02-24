@@ -2,37 +2,29 @@
 
 A Chrome extension that extracts biomarker data from health services into exportable formats (CSV, JSON, table).
 
-![Extension Version](https://img.shields.io/badge/version-2.7.0-blue.svg)
+![Extension Version](https://img.shields.io/badge/version-2.8.0-blue.svg)
 ![Chrome Extension](https://img.shields.io/badge/platform-Chrome%20Extension-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-## 🚀 What's New (v2.7.0)
+## 🚀 What's New (v2.8.0)
 
-### Code Quality & Maintainability
-- **Modular Architecture** - Extracted CSS and JS into separate modules for easier maintenance
-- **Shared Utilities** - Created canonical source for shared functions across modules
+### Enhanced Export Data
+- **Quest Biomarker ID** - Every exported row now includes the Quest test code (e.g., `50057700`), enabling external mapping to LOINC codes for lab interoperability
+- **Optimal Range Min/Max** - Function Health's optimal ranges now exported alongside Quest reference ranges (e.g., ApoB optimal 40-70 vs Quest ref <90)
+- **Out of Range Direction** - New column shows whether out-of-range results are `above`, `below`, or `in_range` for clinical context
 
-### Visual View Fixes
-- **Below-Detection Values** - Fixed threshold visualization for values like "<2.0" to show clearly in the good zone
-- **Improved Marker Positioning** - Values reported as below detection limit now appear correctly
-
-### New Features
-- **GitHub Feedback Link** - Added subtle feedback icon in popup footer for easy issue reporting
+### Previous Features (v2.7.0)
+- Modular architecture with extracted CSS/JS modules
+- Shared utilities canonical source
+- Below-detection threshold visualization fix
+- GitHub feedback link in popup footer
 
 ### Previous Features (v2.6.0)
 - New Results-Report API with dynamic endpoint discovery
 - Improved categorization (96% API-provided)
 - Reference range in CSV export
-- Fixed sparkline positioning
 - Better qualitative results display
-- API-powered tooltips
-- Native print/PDF support
-
-### Previous Features (v2.5.x)
-- Complete UI redesign with health-focused color palette
-- Premium DM Sans typography and custom SVG icons
-- Interactive trend lines in Visual View
-- Smart biomarker grouping and duplicate elimination
+- API-powered tooltips and native print/PDF support
 
 ## ⚠️ Legal Disclaimer
 
@@ -108,10 +100,10 @@ This extension is an independent tool created to help users export their own bio
 
 ### CSV/Table Output
 ```
-Category,Biomarker,Status,Value,Unit,Reference Range,Date
-Heart & Cardiovascular,HDL Cholesterol,In Range,65,mg/dL,>40,2025-07-25
-Kidney & Renal,Creatinine,In Range,0.9,mg/dL,0.7-1.3,2025-07-25
-Infectious Disease,Herpes Simplex Virus 1,In Range,<0.90,,<0.90,2025-07-25
+Category,Biomarker,Quest ID,Status,Value,Unit,Reference Range,Optimal Range Min,Optimal Range Max,Out of Range Direction,Date
+Heart & Cardiovascular,Apolipoprotein B (ApoB),50057700,Out of Range,97,mg/dL,<90,40,70,above,2026-01-19
+Heart & Cardiovascular,HDL Cholesterol,50057800,In Range,65,mg/dL,>40,50,90,,2025-07-25
+Infectious Disease,Herpes Simplex Virus 1,70019900,In Range,<0.90,,<0.90,,,in_range,2025-07-25
 ```
 
 ### Biomarker Categories

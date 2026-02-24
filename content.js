@@ -242,15 +242,19 @@ function convertToCSV(data) {
     const rows = [];
     
     // Header row
-    rows.push(['Category', 'Biomarker', 'Status', 'Value', 'Unit', 'Reference Range', 'Date']);
-    
+    rows.push(['Category', 'Biomarker', 'Quest ID', 'Status', 'Value', 'Unit', 'Reference Range', 'Optimal Range Min', 'Optimal Range Max', 'Out of Range Direction', 'Date']);
+
     // Data rows - collect all biomarkers with category info
     const allBiomarkers = [];
     Object.entries(data.categories).forEach(([categoryName, category]) => {
         category.biomarkers.forEach(biomarker => {
             // Get reference range from biomarker (available from results-report API)
             const referenceRange = biomarker.referenceRange || '';
-            
+            const questId = biomarker.questId || '';
+            const optimalRangeMin = biomarker.optimalRangeMin || '';
+            const optimalRangeMax = biomarker.optimalRangeMax || '';
+            const rangeContext = biomarker.rangeContext || '';
+
             // Check if biomarker has historical values
             if (biomarker.historicalValues && Array.isArray(biomarker.historicalValues) && biomarker.historicalValues.length > 0) {
                 // Create a row for each historical value
@@ -258,10 +262,14 @@ function convertToCSV(data) {
                     allBiomarkers.push({
                         category: categoryName,
                         name: biomarker.name,
+                        questId: questId,
                         status: historicalValue.status || biomarker.status,
                         value: historicalValue.value || biomarker.value || '',
                         unit: historicalValue.unit || biomarker.unit || '',
                         referenceRange: referenceRange,
+                        optimalRangeMin: optimalRangeMin,
+                        optimalRangeMax: optimalRangeMax,
+                        rangeContext: rangeContext,
                         date: historicalValue.date || ''
                     });
                 });
@@ -270,10 +278,14 @@ function convertToCSV(data) {
                 allBiomarkers.push({
                     category: categoryName,
                     name: biomarker.name,
+                    questId: questId,
                     status: biomarker.status,
                     value: biomarker.value || '',
                     unit: biomarker.unit || '',
                     referenceRange: referenceRange,
+                    optimalRangeMin: optimalRangeMin,
+                    optimalRangeMax: optimalRangeMax,
+                    rangeContext: rangeContext,
                     date: biomarker.date || ''
                 });
             }
@@ -301,14 +313,18 @@ function convertToCSV(data) {
         rows.push([
             biomarker.category,
             biomarker.name,
+            biomarker.questId,
             biomarker.status,
             biomarker.value,
             biomarker.unit,
             biomarker.referenceRange,
+            biomarker.optimalRangeMin,
+            biomarker.optimalRangeMax,
+            biomarker.rangeContext,
             biomarker.date
         ]);
     });
-    
+
     // Convert to CSV string
     return rows.map(row => 
         row.map(cell => {
@@ -328,12 +344,18 @@ function convertToTable(data) {
     const rows = [];
     
     // Header row
-    rows.push(['Category', 'Biomarker', 'Status', 'Value', 'Unit', 'Date'].join('\t'));
-    
+    rows.push(['Category', 'Biomarker', 'Quest ID', 'Status', 'Value', 'Unit', 'Reference Range', 'Optimal Range Min', 'Optimal Range Max', 'Out of Range Direction', 'Date'].join('\t'));
+
     // Data rows - collect all biomarkers with category info
     const allBiomarkers = [];
     Object.entries(data.categories).forEach(([categoryName, category]) => {
         category.biomarkers.forEach(biomarker => {
+            const referenceRange = biomarker.referenceRange || '';
+            const questId = biomarker.questId || '';
+            const optimalRangeMin = biomarker.optimalRangeMin || '';
+            const optimalRangeMax = biomarker.optimalRangeMax || '';
+            const rangeContext = biomarker.rangeContext || '';
+
             // Check if biomarker has historical values
             if (biomarker.historicalValues && Array.isArray(biomarker.historicalValues) && biomarker.historicalValues.length > 0) {
                 // Create a row for each historical value
@@ -341,9 +363,14 @@ function convertToTable(data) {
                     allBiomarkers.push({
                         category: categoryName,
                         name: biomarker.name,
+                        questId: questId,
                         status: historicalValue.status || biomarker.status,
                         value: historicalValue.value || biomarker.value || '',
                         unit: historicalValue.unit || biomarker.unit || '',
+                        referenceRange: referenceRange,
+                        optimalRangeMin: optimalRangeMin,
+                        optimalRangeMax: optimalRangeMax,
+                        rangeContext: rangeContext,
                         date: historicalValue.date || ''
                     });
                 });
@@ -352,9 +379,14 @@ function convertToTable(data) {
                 allBiomarkers.push({
                     category: categoryName,
                     name: biomarker.name,
+                    questId: questId,
                     status: biomarker.status,
                     value: biomarker.value || '',
                     unit: biomarker.unit || '',
+                    referenceRange: referenceRange,
+                    optimalRangeMin: optimalRangeMin,
+                    optimalRangeMax: optimalRangeMax,
+                    rangeContext: rangeContext,
                     date: biomarker.date || ''
                 });
             }
@@ -382,9 +414,14 @@ function convertToTable(data) {
         rows.push([
             biomarker.category,
             biomarker.name,
+            biomarker.questId,
             biomarker.status,
             biomarker.value,
             biomarker.unit,
+            biomarker.referenceRange,
+            biomarker.optimalRangeMin,
+            biomarker.optimalRangeMax,
+            biomarker.rangeContext,
             biomarker.date
         ].join('\t'));
     });
