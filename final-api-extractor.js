@@ -21,13 +21,17 @@ const KNOWN_ENDPOINTS = {
  * Known base URLs (ordered by preference, most likely first)
  */
 const KNOWN_BASE_URLS = [
+    // FH retired the raw Cloud Run hostname (production-member-app-mid-
+    // lhuqotpy2a-ue.a.run.app) — every path now 404s. The stable host is below.
+    'https://member-app-mid.functionhealth.com',
+    // Legacy Cloud Run host kept as a last-ditch fallback in case of rollback.
     'https://production-member-app-mid-lhuqotpy2a-ue.a.run.app'
 ];
 
 /**
  * Current app version for API headers
  */
-const FE_APP_VERSION = '0.84.76';
+const FE_APP_VERSION = '0.84.99';
 
 /**
  * Cache for discovered API base URL (persists for page session)
@@ -48,8 +52,11 @@ function setupApiDiscovery() {
         const request = new Request(input, init);
         const url = request.url;
         
-        // Check if this is a Function Health API call
-        if (url.includes('/api/v1/') && url.includes('.run.app')) {
+        // Check if this is a Function Health member-app API call.
+        // Matches both the current host (member-app-mid.functionhealth.com)
+        // and the legacy Cloud Run host (*.run.app) so discovery keeps working
+        // across host migrations.
+        if (url.includes('/api/v1/') && (url.includes('member-app-mid') || url.includes('.run.app'))) {
             try {
                 const parsed = new URL(url);
                 const baseUrl = `${parsed.protocol}//${parsed.host}`;
@@ -340,13 +347,18 @@ function getBiomarkerCategoryFromName(biomarkerName) {
     if (!biomarkerName) return 'Infectious Disease';
     
     const name = biomarkerName.toLowerCase();
-    
+
+    // Biological Age has no API category but is its own well-known category
+    if (name.includes('biological age')) {
+        return 'Biological Age';
+    }
+
     // Infectious disease tests (the main use case for this fallback)
     const infectiousKeywords = [
         'herpes', 'hiv', 'chlamydia', 'gonorrhoea', 'gonorrhea',
         'syphilis', 'trichomonas', 'hepatitis', 'std', 'sti'
     ];
-    
+
     for (const keyword of infectiousKeywords) {
         if (name.includes(keyword)) {
             return 'Infectious Disease';

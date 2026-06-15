@@ -2,9 +2,14 @@
 
 A Chrome extension that extracts biomarker data from health services into exportable formats (CSV, JSON, table).
 
-![Extension Version](https://img.shields.io/badge/version-2.8.0-blue.svg)
+![Extension Version](https://img.shields.io/badge/version-2.8.1-blue.svg)
 ![Chrome Extension](https://img.shields.io/badge/platform-Chrome%20Extension-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
+
+## 🚀 What's New (v2.8.1)
+
+### Fixes
+- **Function Health API host migration** - FH retired the legacy Cloud Run host (`production-member-app-mid-…run.app`), which now 404s. Updated to the stable host `member-app-mid.functionhealth.com` and fixed endpoint auto-discovery to recognize it (request/response shapes are unchanged)
 
 ## 🚀 What's New (v2.8.0)
 

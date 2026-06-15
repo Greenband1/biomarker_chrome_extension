@@ -40,6 +40,10 @@ dist/
 build/
 *.zip
 
+# Secrets and personal health data fixtures (never commit)
+credentials.txt
+example-results-report-functionhealth-api.txt
+
 # Environment variables
 .env
 .env.local
