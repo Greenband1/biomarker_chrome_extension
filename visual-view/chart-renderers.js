@@ -1164,7 +1164,14 @@ export function createMiniSparkline(events, refData) {
             const value = point.event.numericValue ?? point.event.value;
             const date = formatShortDate(point.event.date);
             
-            tooltip.innerHTML = `<strong>${value}</strong><br><span>${date}</span>`;
+            tooltip.replaceChildren();
+            const strong = document.createElement('strong');
+            strong.textContent = String(value ?? '');
+            const dateSpan = document.createElement('span');
+            dateSpan.textContent = String(date ?? '');
+            tooltip.appendChild(strong);
+            tooltip.appendChild(document.createElement('br'));
+            tooltip.appendChild(dateSpan);
             tooltip.style.display = 'block';
             
             const svgRect = svg.getBoundingClientRect();
@@ -1698,11 +1705,22 @@ export function createSimpleSparkline(events) {
             
             if (tooltipY < 0) tooltipY = dotY + (rect.top - containerRect.top) + 20;
             
-            tooltip.innerHTML = `
-                <div class="fh-chart-tooltip-value">${formatValue(point.event.value, point.event.unit)}</div>
-                <div class="fh-chart-tooltip-date">${formatDisplayDate(point.event.date)}</div>
-                <div class="fh-chart-tooltip-status fh-status-${normalizeStatus(point.event.status)}">${point.event.status}</div>
-            `;
+            tooltip.replaceChildren();
+            const valueDiv = document.createElement('div');
+            valueDiv.className = 'fh-chart-tooltip-value';
+            valueDiv.textContent = formatValue(point.event.value, point.event.unit);
+
+            const dateDiv = document.createElement('div');
+            dateDiv.className = 'fh-chart-tooltip-date';
+            dateDiv.textContent = formatDisplayDate(point.event.date);
+
+            const statusDiv = document.createElement('div');
+            statusDiv.className = `fh-chart-tooltip-status fh-status-${normalizeStatus(point.event.status)}`;
+            statusDiv.textContent = String(point.event.status ?? '');
+
+            tooltip.appendChild(valueDiv);
+            tooltip.appendChild(dateDiv);
+            tooltip.appendChild(statusDiv);
             tooltip.style.left = `${tooltipX}px`;
             tooltip.style.top = `${tooltipY}px`;
             tooltip.classList.add('fh-chart-tooltip--visible');
@@ -1758,4 +1776,3 @@ export function createHistoryFooter(events, type) {
 
     return footer;
 }
-

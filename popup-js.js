@@ -290,7 +290,7 @@ function showNotification(message, type = 'info', duration = null) {
     if (currentNotificationTimeout) {
         clearTimeout(currentNotificationTimeout);
     }
-    container.innerHTML = '';
+    container.replaceChildren();
     
     // Create notification element
     const notification = document.createElement('div');
@@ -750,7 +750,7 @@ function analyzeDataForFilters(data) {
 function populateFilterInterface() {
     // Populate date checkboxes
     const dateContainer = document.getElementById('dateCheckboxes');
-    dateContainer.innerHTML = '';
+    dateContainer.replaceChildren();
     
     appState.availableDates.forEach(date => {
         const div = document.createElement('div');
@@ -776,7 +776,7 @@ function populateFilterInterface() {
     
     // Populate category checkboxes
     const categoryContainer = document.getElementById('categoryCheckboxes');
-    categoryContainer.innerHTML = '';
+    categoryContainer.replaceChildren();
     
     appState.availableCategories.forEach(category => {
         const div = document.createElement('div');

@@ -601,7 +601,7 @@ const VisualOverlay = {
             return;
         }
         
-        this.headerControls.innerHTML = '';
+        this.headerControls.replaceChildren();
 
         // Category dropdown control
         const categoryControl = document.createElement('div');
@@ -745,7 +745,7 @@ const VisualOverlay = {
         const categories = Object.keys(dataset.categories).sort((a, b) => a.localeCompare(b));
 
         const buildList = () => {
-            list.innerHTML = '';
+            list.replaceChildren();
             categories.forEach((name) => {
                 const item = document.createElement('label');
                 item.className = 'fh-dropdown-item';
@@ -975,7 +975,7 @@ const VisualOverlay = {
         ];
 
         const buildList = () => {
-            list.innerHTML = '';
+            list.replaceChildren();
             statusOptions.forEach(({ id, label, color }) => {
                 const item = document.createElement('label');
                 item.className = 'fh-dropdown-item';
@@ -1062,11 +1062,22 @@ const VisualOverlay = {
         if (this.selectedCategories.size === 0 || this.selectedDates.size === 0) {
             const emptyState = document.createElement('div');
             emptyState.className = 'fh-empty-state';
-            emptyState.innerHTML = `
-                <div class="fh-empty-icon">📊</div>
-                <div class="fh-empty-title">No data selected</div>
-                <div class="fh-empty-message">Please select at least one category and one test date to view biomarker trends.</div>
-            `;
+            const emptyIcon = document.createElement('div');
+            emptyIcon.className = 'fh-empty-icon';
+            emptyIcon.textContent = '📊';
+
+            const emptyTitle = document.createElement('div');
+            emptyTitle.className = 'fh-empty-title';
+            emptyTitle.textContent = 'No data selected';
+
+            const emptyMessage = document.createElement('div');
+            emptyMessage.className = 'fh-empty-message';
+            emptyMessage.textContent =
+                'Please select at least one category and one test date to view biomarker trends.';
+
+            emptyState.appendChild(emptyIcon);
+            emptyState.appendChild(emptyTitle);
+            emptyState.appendChild(emptyMessage);
             this.content.appendChild(emptyState);
             return;
         }
@@ -1537,7 +1548,7 @@ function createBiomarkerCard(biomarker) {
     const infoButton = document.createElement('button');
     infoButton.type = 'button';
     infoButton.className = 'fh-info-button';
-    infoButton.innerHTML = 'ℹ';
+    infoButton.textContent = 'ℹ';
     infoButton.setAttribute('aria-label', 'Learn more about this biomarker');
     
     // Use API-provided description if available, fallback to hardcoded info
@@ -1546,11 +1557,23 @@ function createBiomarkerCard(biomarker) {
     
     const tooltip = document.createElement('div');
     tooltip.className = 'fh-info-tooltip';
-    tooltip.innerHTML = `
-        <div class="fh-tooltip-row"><strong>What:</strong> ${apiDescription || info.what}</div>
-        <div class="fh-tooltip-row"><strong>Why it matters:</strong> ${info.why}</div>
-        <div class="fh-tooltip-row"><strong>Affected by:</strong> ${info.affects}</div>
-    `;
+    const tooltipRows = [
+        { label: 'What:', value: apiDescription || info.what },
+        { label: 'Why it matters:', value: info.why },
+        { label: 'Affected by:', value: info.affects },
+    ];
+    tooltipRows.forEach(({ label, value }) => {
+        const row = document.createElement('div');
+        row.className = 'fh-tooltip-row';
+
+        const strong = document.createElement('strong');
+        strong.textContent = label;
+
+        row.appendChild(strong);
+        row.appendChild(document.createTextNode(' '));
+        row.appendChild(document.createTextNode(String(value ?? '')));
+        tooltip.appendChild(row);
+    });
     infoButton.appendChild(tooltip);
 
     const badge = document.createElement('span');
@@ -2536,7 +2559,14 @@ function createMiniSparkline(events, refData) {
             const value = point.event.numericValue ?? point.event.value;
             const date = formatShortDate(point.event.date);
             
-            tooltip.innerHTML = `<strong>${value}</strong><br><span>${date}</span>`;
+            tooltip.replaceChildren();
+            const strong = document.createElement('strong');
+            strong.textContent = String(value ?? '');
+            const dateSpan = document.createElement('span');
+            dateSpan.textContent = String(date ?? '');
+            tooltip.appendChild(strong);
+            tooltip.appendChild(document.createElement('br'));
+            tooltip.appendChild(dateSpan);
             tooltip.style.display = 'block';
             
             // Position tooltip - calculate based on SVG viewBox to container ratio
@@ -3148,11 +3178,22 @@ function createSimpleSparkline(events) {
             // Ensure tooltip stays within bounds
             if (tooltipY < 0) tooltipY = dotY + (rect.top - containerRect.top) + 20;
             
-            tooltip.innerHTML = `
-                <div class="fh-chart-tooltip-value">${formatValue(point.event.value, point.event.unit)}</div>
-                <div class="fh-chart-tooltip-date">${formatDisplayDate(point.event.date)}</div>
-                <div class="fh-chart-tooltip-status fh-status-${normalizeStatus(point.event.status)}">${point.event.status}</div>
-            `;
+            tooltip.replaceChildren();
+            const valueDiv = document.createElement('div');
+            valueDiv.className = 'fh-chart-tooltip-value';
+            valueDiv.textContent = formatValue(point.event.value, point.event.unit);
+
+            const dateDiv = document.createElement('div');
+            dateDiv.className = 'fh-chart-tooltip-date';
+            dateDiv.textContent = formatDisplayDate(point.event.date);
+
+            const statusDiv = document.createElement('div');
+            statusDiv.className = `fh-chart-tooltip-status fh-status-${normalizeStatus(point.event.status)}`;
+            statusDiv.textContent = String(point.event.status ?? '');
+
+            tooltip.appendChild(valueDiv);
+            tooltip.appendChild(dateDiv);
+            tooltip.appendChild(statusDiv);
             tooltip.style.left = `${tooltipX}px`;
             tooltip.style.top = `${tooltipY}px`;
             tooltip.classList.add('fh-chart-tooltip--visible');
